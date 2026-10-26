@@ -8,6 +8,123 @@
 namespace ZipTies {
 
 // ============================================================================
+// 0. NIM-BIN PANEL TYPOGRAPHY & HAZARD STRIPES OVERLAY
+//    (Drawn via NanoVG because VCV's NanoSVG ignores <text> and <pattern>)
+// ============================================================================
+struct NimPanelGraphicsWidget : widget::TransparentWidget {
+	void draw(const DrawArgs& args) override {
+		NVGcontext* vg = args.vg;
+		if (!APP || !APP->window || !APP->window->uiFont) return;
+
+		nvgSave(vg);
+		nvgFontFaceId(vg, APP->window->uiFont->handle);
+		nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+		float cx = box.size.x * 0.5f;
+
+		// 1. Top NIM-BIN Header (on brushed aluminum, no empty black box)
+		nvgFontSize(vg, 12.5f);
+		nvgTextLetterSpacing(vg, 1.5f);
+		nvgFillColor(vg, nvgRGB(26, 30, 34));
+		nvgText(vg, cx + 0.5f, 25.0f, "ZIP-TIE", NULL);
+
+		// Terracotta model badge
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, 13.0f, 32.5f, 64.0f, 9.0f, 1.5f);
+		nvgFillColor(vg, nvgRGB(184, 58, 27));
+		nvgFill(vg);
+
+		nvgFontSize(vg, 6.8f);
+		nvgTextLetterSpacing(vg, 0.9f);
+		nvgFillColor(vg, nvgRGB(246, 245, 240));
+		nvgText(vg, cx + 0.4f, 37.2f, "NIM-406 HARNESS", NULL);
+
+		// 2. Section 1 Header: Shortcut Tape
+		nvgFontSize(vg, 6.8f);
+		nvgTextLetterSpacing(vg, 1.0f);
+		nvgFillColor(vg, nvgRGB(38, 42, 46));
+		nvgText(vg, cx + 0.4f, 51.5f, "KEY SHORTCUT", NULL);
+
+		// 3. Section 2 Header: Rectangular Tie Applicator
+		nvgFontSize(vg, 7.2f);
+		nvgTextLetterSpacing(vg, 0.9f);
+		nvgFillColor(vg, nvgRGB(28, 32, 36));
+		nvgText(vg, cx + 0.4f, 106.5f, "TIE APPLICATOR", NULL);
+
+		nvgFontSize(vg, 6.0f);
+		nvgTextLetterSpacing(vg, 0.8f);
+		nvgFillColor(vg, nvgRGB(184, 58, 27));
+		nvgText(vg, cx + 0.4f, 115.0f, "MANUAL ARM", NULL);
+
+		// 4. Section 3 Header: Harness Pitch & Scale Labels
+		nvgFontSize(vg, 7.2f);
+		nvgTextLetterSpacing(vg, 0.9f);
+		nvgFillColor(vg, nvgRGB(28, 32, 36));
+		nvgText(vg, cx + 0.4f, 168.5f, "HARNESS PITCH", NULL);
+
+		// MIN / MAX calibration labels around knob
+		nvgFontSize(vg, 6.5f);
+		nvgTextLetterSpacing(vg, 0.4f);
+		nvgFillColor(vg, nvgRGB(38, 42, 46));
+		nvgText(vg, 20.0f, 272.5f, "MIN", NULL);
+		nvgFillColor(vg, nvgRGB(184, 58, 27));
+		nvgText(vg, 70.0f, 272.5f, "MAX", NULL);
+
+		// 5. Section 4 Header: Danger Jettison All & Diagonal Hazard Stripes
+		nvgFontSize(vg, 7.2f);
+		nvgTextLetterSpacing(vg, 0.9f);
+		nvgFillColor(vg, nvgRGB(180, 28, 20));
+		nvgText(vg, cx + 0.4f, 288.5f, "JETTISON ALL", NULL);
+
+		// Diagonal Yellow/Black Hazard Stripes Frame around Molly-Guard (x=16, y=295, w=58, h=46)
+		float hx = 16.0f;
+		float hy = 295.0f;
+		float hw = 58.0f;
+		float hh = 46.0f;
+
+		nvgSave(vg);
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, hx, hy, hw, hh, 2.5f);
+		nvgFillColor(vg, nvgRGB(224, 162, 24)); // Hazard amber-yellow base
+		nvgFill(vg);
+
+		// Clip diagonal black stripes inside hazard box
+		nvgIntersectScissor(vg, hx, hy, hw, hh);
+		nvgStrokeColor(vg, nvgRGB(26, 29, 32));
+		nvgStrokeWidth(vg, 4.2f);
+		nvgLineCap(vg, NVG_BUTT);
+		for (float s = -hh; s < hw + hh; s += 8.4f) {
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, hx + s, hy + hh + 2.0f);
+			nvgLineTo(vg, hx + s + hh + 4.0f, hy - 2.0f);
+			nvgStroke(vg);
+		}
+		nvgRestore(vg);
+
+		// Outer border around hazard box
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, hx, hy, hw, hh, 2.5f);
+		nvgStrokeColor(vg, nvgRGB(26, 29, 32));
+		nvgStrokeWidth(vg, 1.0f);
+		nvgStroke(vg);
+
+		// Subtitle below Molly-Guard
+		nvgFontSize(vg, 5.8f);
+		nvgTextLetterSpacing(vg, 0.5f);
+		nvgFillColor(vg, nvgRGB(48, 52, 56));
+		nvgText(vg, cx + 0.3f, 346.8f, "LIFT GUARD · 2X CLICK", NULL);
+
+		// 6. Bottom NIM-BIN Footer (silkscreened on aluminum, no black bar)
+		nvgFontSize(vg, 6.2f);
+		nvgTextLetterSpacing(vg, 1.2f);
+		nvgFillColor(vg, nvgRGB(42, 46, 50));
+		nvgText(vg, cx + 0.5f, 358.0f, "NIM-BIN · STD", NULL);
+
+		nvgRestore(vg);
+	}
+};
+
+// ============================================================================
 // 1. SCOTCH TAPE + SHARPIE SHORTCUT DISPLAY
 // ============================================================================
 struct ScotchTapeWidget : widget::TransparentWidget {
@@ -28,9 +145,9 @@ struct ScotchTapeWidget : widget::TransparentWidget {
 		nvgTranslate(vg, -cx, -cy);
 
 		float tx = 4.0f;
-		float ty = 6.0f;
+		float ty = 5.0f;
 		float tw = w - 8.0f;
-		float th = h - 12.0f;
+		float th = h - 10.0f;
 		int teeth = 7;
 		float toothH = th / (float)teeth;
 		float jag = 2.6f;
@@ -39,7 +156,7 @@ struct ScotchTapeWidget : widget::TransparentWidget {
 		auto traceTapePath = [&](float offsetX, float offsetY) {
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, tx + offsetX, ty + offsetY);
-			// Top edge (slight organic bow)
+			// Top edge
 			nvgQuadTo(vg, cx + offsetX, ty - 0.6f + offsetY, tx + tw + offsetX, ty + offsetY);
 			// Right serrated torn edge
 			for (int i = 0; i < teeth; ++i) {
@@ -355,6 +472,9 @@ struct RectangularZipTieButton : widget::OpaqueWidget {
 
 // ============================================================================
 // 3. 3 FAKE PREVIEW WIRES SNAKING OUT & BACK INTO PANEL
+//    - At MAX (6.0): wires have NO gap and NO overlap (touch edge-to-edge)
+//    - At MIN (2.0): wires ALMOST ENTIRELY overlap (matching real tied wires)
+//    - Snug pass-through slots on left/right with zero excess black space
 // ============================================================================
 struct WirePreviewWidget : widget::TransparentWidget {
 	ZipTieModule* module = nullptr;
@@ -372,183 +492,207 @@ struct WirePreviewWidget : widget::TransparentWidget {
 		int tieStyle = 0;
 		if (module) {
 			rawSpacing = module->params[ZipTieModule::PARAM_WIRE_SPACING].getValue();
-			tieStyle = (int)module->params[ZipTieModule::PARAM_TIE_STYLE].getValue();
+			tieStyle = (int)std::round(module->params[ZipTieModule::PARAM_TIE_STYLE].getValue());
 		}
 
-		// Map 2.0..6.0 px parameter to a clear visual spread inside the preview bay
-		float previewPitch = 2.6f + (rawSpacing - 2.0f) * 1.95f; // 2.6px at min, 10.4px at max
+		// Wire thickness matches real Rack cables (6.0f outer, 5.0f inner)
+		const float wireOuter = 5.8f;
+		const float wireInner = 4.8f;
+		const float wireRadius = wireOuter * 0.5f;
 
-		float leftHoleX = 9.5f;
-		float rightHoleX = w - 9.5f;
+		// Normalize knob position t in [0.0 (MIN) .. 1.0 (MAX)]
+		float t = math::clamp((rawSpacing - 2.0f) / 4.0f, 0.0f, 1.0f);
+
+		// At MAX (t=1): pitch == 5.6f -> exact edge-to-edge contact (no gap, no overlap)
+		// At MIN (t=0): pitch == 1.05f -> wires almost entirely overlap (~82% overlap)
+		float pitch = 1.05f + t * (5.60f - 1.05f);
+
+		float leftX = 11.0f;
+		float rightX = w - 11.0f;
 		float midX = w * 0.5f;
-		float holeRx = 4.8f;
-		float holeRy = 13.5f;
 
-		// 1. Draw recessed panel pass-through grommet holes (left & right)
-		auto drawPanelGrommetBack = [&](float hx, float hy) {
-			// Machined aluminum bevel around hole
-			nvgBeginPath(vg);
-			nvgEllipse(vg, hx, hy, holeRx + 1.6f, holeRy + 1.6f);
-			nvgFillColor(vg, nvgRGB(42, 46, 50));
-			nvgFill(vg);
-			nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 130));
-			nvgStrokeWidth(vg, 0.7f);
-			nvgStroke(vg);
-
-			// Dark interior cavity under the panel
-			nvgBeginPath(vg);
-			nvgEllipse(vg, hx, hy, holeRx, holeRy);
-			nvgFillColor(vg, nvgRGB(10, 12, 14));
-			nvgFill(vg);
-		};
-
-		drawPanelGrommetBack(leftHoleX, cy);
-		drawPanelGrommetBack(rightHoleX, cy);
-
-		// 2. Define the 3 fake wires: Red, Blue, Gold
-		NVGcolor wireColors[3] = {
-			nvgRGB(209, 44, 38),  // Classic red wire
-			nvgRGB(36, 114, 200), // Classic blue wire
-			nvgRGB(224, 162, 28)  // Classic amber/yellow wire
-		};
+		// Slight S-bow / arch so the 3 wires visibly snake out from left, across, and back in on right
+		float endBowY = 2.0f;
+		float midBowY = -1.2f;
 
 		// Offsets: index 0 = top (-1), index 1 = middle (0), index 2 = bottom (+1)
 		float indices[3] = { -1.0f, 0.0f, 1.0f };
 
+		// 1. Draw snug pass-through grommet slots on left and right that tightly hug the wires
+		//    (so there is never any empty black void above or below the wires)
+		float slotHalfSpan = pitch + wireRadius + 0.8f;
+		float slotW = 5.4f;
+
+		auto drawSnugPassThroughBack = [&](float sx, float sy) {
+			// Machined aluminum outer bezel rim around the slot
+			nvgBeginPath(vg);
+			nvgRoundedRect(
+				vg,
+				sx - slotW * 0.5f - 1.2f,
+				sy - slotHalfSpan - 1.2f,
+				slotW + 2.4f,
+				slotHalfSpan * 2.0f + 2.4f,
+				(slotW + 2.4f) * 0.5f
+			);
+			nvgFillColor(vg, nvgRGB(62, 66, 70));
+			nvgFill(vg);
+			nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 140));
+			nvgStrokeWidth(vg, 0.7f);
+			nvgStroke(vg);
+
+			// Snug dark rubber grommet opening (exact height of the wire bundle)
+			nvgBeginPath(vg);
+			nvgRoundedRect(
+				vg,
+				sx - slotW * 0.5f,
+				sy - slotHalfSpan,
+				slotW,
+				slotHalfSpan * 2.0f,
+				slotW * 0.5f
+			);
+			nvgFillColor(vg, nvgRGB(18, 20, 22));
+			nvgFill(vg);
+		};
+
+		drawSnugPassThroughBack(leftX, cy + endBowY);
+		drawSnugPassThroughBack(rightX, cy + endBowY);
+
+		// 2. Define the 3 fake wires: Red, Blue, Gold (matching VCV cable palette)
+		NVGcolor wireColors[3] = {
+			nvgRGB(215, 46, 40),  // Red cable
+			nvgRGB(38, 122, 212), // Blue cable
+			nvgRGB(232, 170, 28)  // Yellow/Gold cable
+		};
+
 		nvgLineCap(vg, NVG_ROUND);
 		nvgLineJoin(vg, NVG_ROUND);
 
-		// 3. Pass 1: Drop shadows of all 3 wires on the aluminum panel
-		for (int i = 0; i < 3; ++i) {
-			float idx = indices[i];
-			float yEnds = cy + idx * 3.8f;
-			float yMid = cy + idx * previewPitch;
+		auto traceWirePath = [&](float idx, float dropY) {
+			float yEnd = cy + endBowY + idx * pitch + dropY;
+			float yMid = cy + midBowY + idx * pitch + dropY;
 
 			nvgBeginPath(vg);
-			nvgMoveTo(vg, leftHoleX - 1.0f, yEnds + 2.5f);
+			nvgMoveTo(vg, leftX, yEnd);
 			nvgBezierTo(
 				vg,
-				leftHoleX + 13.0f, yMid + 2.5f,
-				midX - 11.0f, yMid + 2.5f,
-				midX, yMid + 2.5f
+				leftX + 11.0f, yMid,
+				midX - 11.0f, yMid,
+				midX, yMid
 			);
 			nvgBezierTo(
 				vg,
-				midX + 11.0f, yMid + 2.5f,
-				rightHoleX - 13.0f, yMid + 2.5f,
-				rightHoleX + 1.0f, yEnds + 2.5f
+				midX + 11.0f, yMid,
+				rightX - 11.0f, yMid,
+				rightX, yEnd
 			);
-			nvgStrokeColor(vg, nvgRGBA(0, 0, 0, 75));
-			nvgStrokeWidth(vg, 4.4f);
-			nvgStroke(vg);
-		}
-
-		// 4. Pass 2: Draw the 3 wire bodies emerging from left hole, across, and into right hole
-		for (int i = 0; i < 3; ++i) {
-			float idx = indices[i];
-			float yEnds = cy + idx * 3.8f;
-			float yMid = cy + idx * previewPitch;
-			NVGcolor col = wireColors[i];
-
-			// Wire path
-			auto traceWire = [&]() {
-				nvgBeginPath(vg);
-				nvgMoveTo(vg, leftHoleX - 1.2f, yEnds);
-				nvgBezierTo(
-					vg,
-					leftHoleX + 13.0f, yMid,
-					midX - 11.0f, yMid,
-					midX, yMid
-				);
-				nvgBezierTo(
-					vg,
-					midX + 11.0f, yMid,
-					rightHoleX - 13.0f, yMid,
-					rightHoleX + 1.2f, yEnds
-				);
-			};
-
-			// Outer darker insulation jacket
-			traceWire();
-			nvgStrokeColor(vg, color::mult(col, 0.72f));
-			nvgStrokeWidth(vg, 4.2f);
-			nvgStroke(vg);
-
-			// Inner bright insulation core
-			traceWire();
-			nvgStrokeColor(vg, col);
-			nvgStrokeWidth(vg, 3.1f);
-			nvgStroke(vg);
-
-			// Specular highlight along wire
-			traceWire();
-			nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 65));
-			nvgStrokeWidth(vg, 1.0f);
-			nvgStroke(vg);
-		}
-
-		// 5. Draw grommet outer lips overlapping the extreme outer edges so wires clearly tuck UNDER the panel
-		auto drawGrommetOuterShadowClip = [&](float hx, float hy, bool isLeft) {
-			nvgSave(vg);
-			nvgBeginPath(vg);
-			nvgEllipse(vg, hx, hy, holeRx, holeRy);
-			// Inner cavity shadow gradient where wires dive into darkness
-			NVGpaint holeShade = nvgLinearGradient(
-				vg,
-				isLeft ? hx - holeRx : hx + holeRx, hy,
-				isLeft ? hx + holeRx : hx - holeRx, hy,
-				nvgRGBA(0, 0, 0, 220),
-				nvgRGBA(0, 0, 0, 0)
-			);
-			nvgFillPaint(vg, holeShade);
-			nvgFill(vg);
-
-			// Crisp rubber grommet ring
-			nvgBeginPath(vg);
-			nvgEllipse(vg, hx, hy, holeRx + 0.8f, holeRy + 0.8f);
-			nvgStrokeColor(vg, nvgRGB(22, 25, 28));
-			nvgStrokeWidth(vg, 1.6f);
-			nvgStroke(vg);
-			nvgRestore(vg);
 		};
 
-		drawGrommetOuterShadowClip(leftHoleX, cy, true);
-		drawGrommetOuterShadowClip(rightHoleX, cy, false);
+		// 3. Pass 1: Drop shadow cast by the snaking wire bundle onto the aluminum panel
+		for (int i = 0; i < 3; ++i) {
+			traceWirePath(indices[i], 2.4f);
+			nvgStrokeColor(vg, nvgRGBA(0, 0, 0, 65));
+			nvgStrokeWidth(vg, wireOuter);
+			nvgStroke(vg);
+		}
+
+		// 4. Pass 2: Draw each wire (matching HarnessOverlayWidget cable rendering: 0.8x outer, 0.95x inner)
+		for (int i = 0; i < 3; ++i) {
+			float idx = indices[i];
+			NVGcolor col = wireColors[i];
+
+			// Outer cable jacket (width = wireOuter)
+			traceWirePath(idx, 0.0f);
+			nvgStrokeColor(vg, color::mult(col, 0.78f));
+			nvgStrokeWidth(vg, wireOuter);
+			nvgStroke(vg);
+
+			// Inner cable body (width = wireInner)
+			traceWirePath(idx, 0.0f);
+			nvgStrokeColor(vg, color::mult(col, 0.96f));
+			nvgStrokeWidth(vg, wireInner);
+			nvgStroke(vg);
+
+			// Subtle cylindrical highlight along upper-center of wire
+			traceWirePath(idx, -0.5f);
+			nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 48));
+			nvgStrokeWidth(vg, 1.1f);
+			nvgStroke(vg);
+		}
+
+		// 5. Draw machined aluminum pass-through hoods over the outer edges of the left/right slots
+		//    so the wires clearly emerge from UNDER the panel on the left and tuck UNDER on the right
+		auto drawPassThroughHood = [&](float sx, float sy, bool isLeft) {
+			float hoodX = isLeft ? (sx - slotW * 0.5f - 2.2f) : sx;
+			float hoodW = slotW * 0.5f + 2.2f;
+			float hoodY = sy - slotHalfSpan - 0.5f;
+			float hoodH = slotHalfSpan * 2.0f + 1.0f;
+
+			// Subtle shadow cast by panel lip onto emerging wires
+			nvgBeginPath(vg);
+			nvgRect(
+				vg,
+				isLeft ? sx - 1.0f : sx - 2.5f,
+				hoodY + 1.0f,
+				3.5f,
+				hoodH - 2.0f
+			);
+			nvgFillColor(vg, nvgRGBA(0, 0, 0, 95));
+			nvgFill(vg);
+
+			// Brushed aluminum panel lip overlapping outer wire tips
+			nvgBeginPath(vg);
+			nvgRoundedRect(vg, hoodX, hoodY, hoodW, hoodH, 1.5f);
+			nvgFillColor(vg, nvgRGB(208, 211, 205));
+			nvgFill(vg);
+
+			// Crisp inner bevel edge where wires emerge
+			float bevelX = isLeft ? (hoodX + hoodW) : hoodX;
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, bevelX, hoodY + 0.5f);
+			nvgLineTo(vg, bevelX, hoodY + hoodH - 0.5f);
+			nvgStrokeColor(vg, nvgRGB(42, 46, 50));
+			nvgStrokeWidth(vg, 1.1f);
+			nvgStroke(vg);
+		};
+
+		drawPassThroughHood(leftX, cy + endBowY, true);
+		drawPassThroughHood(rightX, cy + endBowY, false);
 
 		// 6. Draw Miniature Zip Tie cinching the 3 preview wires at midX
-		float bundleSpan = 2.0f * previewPitch;
-		float tieH = bundleSpan + 9.0f;
+		float bundleCenterY = cy + midBowY;
+		float tieH = 2.0f * pitch + wireOuter + 5.0f;
 		float tieW = 5.5f;
 		float tieX = midX - tieW * 0.5f;
-		float tieY = cy - tieH * 0.5f;
+		float tieY = bundleCenterY - tieH * 0.5f;
 
-		NVGcolor tieBodyCol = (tieStyle == 1)
+		bool isBlackTie = (tieStyle == 1);
+		NVGcolor tieBodyCol = isBlackTie
 			? nvgRGB(28, 30, 34)
-			: nvgRGBA(235, 238, 242, 215);
+			: nvgRGBA(235, 238, 242, 205);
 
-		// Mini zip tie shadow
+		// Mini zip tie drop shadow
 		nvgBeginPath(vg);
-		nvgRoundedRect(vg, tieX + 0.8f, tieY + 1.2f, tieW, tieH, 2.0f);
-		nvgFillColor(vg, nvgRGBA(0, 0, 0, 80));
+		nvgRoundedRect(vg, tieX + 1.0f, tieY + 1.5f, tieW, tieH, 2.0f);
+		nvgFillColor(vg, nvgRGBA(0, 0, 0, 65));
 		nvgFill(vg);
 
-		// Mini zip tie band
+		// Mini zip tie strap body
 		nvgBeginPath(vg);
 		nvgRoundedRect(vg, tieX, tieY, tieW, tieH, 2.0f);
 		nvgFillColor(vg, tieBodyCol);
 		nvgFill(vg);
-		nvgStrokeColor(vg, (tieStyle == 1) ? nvgRGBA(255, 255, 255, 55) : nvgRGBA(255, 255, 255, 140));
-		nvgStrokeWidth(vg, 0.8f);
+		nvgStrokeColor(vg, isBlackTie ? nvgRGBA(255, 255, 255, 55) : nvgRGBA(255, 255, 255, 150));
+		nvgStrokeWidth(vg, 0.85f);
 		nvgStroke(vg);
 
 		// Mini zip tie buckle head at top of bundle
-		float headW = tieW + 2.0f;
-		float headH = 4.2f;
+		float headW = tieW + 1.8f;
+		float headH = 4.0f;
 		nvgBeginPath(vg);
-		nvgRoundedRect(vg, midX - headW * 0.5f, tieY - 1.5f, headW, headH, 1.2f);
+		nvgRoundedRect(vg, midX - headW * 0.5f, tieY - 1.2f, headW, headH, 1.2f);
 		nvgFillColor(vg, color::mult(tieBodyCol, 0.85f));
 		nvgFill(vg);
-		nvgStrokeColor(vg, nvgRGBA(0, 0, 0, 90));
+		nvgStrokeColor(vg, nvgRGBA(0, 0, 0, 80));
 		nvgStrokeWidth(vg, 0.8f);
 		nvgStroke(vg);
 
@@ -671,7 +815,7 @@ struct MollyGuardSnipButton : widget::OpaqueWidget {
 		}
 		bool recentlyTriggered = (now - buttonPressTime) < 0.18;
 
-		// 1. Recessed armored switch well (inside the SVG hazard border)
+		// 1. Recessed armored switch well (inside the hazard border drawn by NimPanelGraphicsWidget)
 		float wellX = 4.0f;
 		float wellY = 4.0f;
 		float wellW = w - 8.0f;
@@ -679,9 +823,9 @@ struct MollyGuardSnipButton : widget::OpaqueWidget {
 
 		nvgBeginPath(vg);
 		nvgRoundedRect(vg, wellX, wellY, wellW, wellH, 2.0f);
-		nvgFillColor(vg, nvgRGB(16, 18, 20));
+		nvgFillColor(vg, nvgRGB(22, 25, 28));
 		nvgFill(vg);
-		nvgStrokeColor(vg, nvgRGB(8, 9, 10));
+		nvgStrokeColor(vg, nvgRGB(10, 12, 14));
 		nvgStrokeWidth(vg, 1.2f);
 		nvgStroke(vg);
 
@@ -689,7 +833,7 @@ struct MollyGuardSnipButton : widget::OpaqueWidget {
 		float btnR = 13.5f;
 		nvgBeginPath(vg);
 		nvgCircle(vg, cx, cy + 1.0f, btnR + 2.8f);
-		nvgFillColor(vg, nvgRGB(55, 60, 66));
+		nvgFillColor(vg, nvgRGB(64, 70, 76));
 		nvgFill(vg);
 		nvgStrokeColor(vg, nvgRGB(20, 22, 25));
 		nvgStrokeWidth(vg, 1.0f);
@@ -719,7 +863,7 @@ struct MollyGuardSnipButton : widget::OpaqueWidget {
 		nvgStrokeWidth(vg, 1.1f);
 		nvgStroke(vg);
 
-		// Warning triangle / text on the red button itself
+		// Warning text on the red button itself
 		if (APP->window->uiFont) {
 			nvgFontFaceId(vg, APP->window->uiFont->handle);
 			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
@@ -954,6 +1098,12 @@ struct ZipTieWidget : app::ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/ZipTie.svg")));
 
+		// 0. NIM-BIN Panel Typography & Hazard Stripes Overlay
+		NimPanelGraphicsWidget* panelGraphics = new NimPanelGraphicsWidget;
+		panelGraphics->box.pos = math::Vec(0, 0);
+		panelGraphics->box.size = box.size;
+		addChild(panelGraphics);
+
 		// Screws (industrial silver screws matching NIM-BIN faceplate)
 		addChild(createWidget<ScrewSilver>(math::Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewSilver>(math::Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -977,7 +1127,7 @@ struct ZipTieWidget : app::ModuleWidget {
 		// 3. 3 Fake Preview Wires Snaking Out & Back In Above the Spacing Knob
 		WirePreviewWidget* previewWires = new WirePreviewWidget;
 		previewWires->module = module;
-		previewWires->box.pos = math::Vec(7, 176);
+		previewWires->box.pos = math::Vec(7, 175);
 		previewWires->box.size = math::Vec(76, 44);
 		addChild(previewWires);
 
@@ -988,7 +1138,7 @@ struct ZipTieWidget : app::ModuleWidget {
 		// 5. Dangerous Delete-All Button with Flip-Up Molly-Guard (2 clicks < 1s)
 		MollyGuardSnipButton* mollyBtn = new MollyGuardSnipButton;
 		mollyBtn->module = module;
-		mollyBtn->box.pos = math::Vec(16, 296);
+		mollyBtn->box.pos = math::Vec(16, 295);
 		mollyBtn->box.size = math::Vec(58, 46);
 		addChild(mollyBtn);
 
