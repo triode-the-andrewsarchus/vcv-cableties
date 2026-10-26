@@ -23,6 +23,7 @@ ZipTieModule::~ZipTieModule() {
 			app::CableWidget* cw = APP->scene->rack->getCable(pair.first);
 			if (cw) {
 				cw->visible = true;
+				restoreCablePlugs(cw);
 			}
 		}
 	}
@@ -120,6 +121,7 @@ void ZipTieModule::removeZipTie(int tieId) {
 				app::CableWidget* cw = APP->scene->rack->getCable(pair.first);
 				if (cw) {
 					cw->visible = true; // Restore normal Rack cable
+					restoreCablePlugs(cw);
 				}
 			}
 		}
@@ -150,6 +152,7 @@ void ZipTieModule::clearAllZipTies() {
 			app::CableWidget* cw = APP->scene->rack->getCable(pair.first);
 			if (cw) {
 				cw->visible = true;
+				restoreCablePlugs(cw);
 			}
 		}
 	}

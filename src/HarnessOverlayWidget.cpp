@@ -294,45 +294,62 @@ void HarnessOverlayWidget::updateCablePaths() {
 			Waypoint& w0 = waypoints[s];
 			Waypoint& w1 = waypoints[s + 1];
 
-			math::Vec p0 = w0.pos;
-			math::Vec p3 = w1.pos;
+			math::Vec rawP0 = w0.pos;
+			math::Vec rawP3 = w1.pos;
 
-			// Endpoints are offset from port center by 14px (matching VCV Rack collar)
-			if (w0.isPort) {
-				math::Vec dir = p3.minus(p0).normalize();
-				p0 = p0.plus(dir.mult(14.f));
-			}
-			if (w1.isPort) {
-				math::Vec dir = p0.minus(p3).normalize();
-				p3 = p3.plus(dir.mult(14.f));
-			}
-
-			float dist = p3.minus(p0).norm();
+			float dist = rawP3.minus(rawP0).norm();
 			math::Vec t0 = w0.tangent;
 			math::Vec t1 = w1.tangent;
 
 			if (w0.isPort) {
-				t0 = p3.minus(p0).normalize().plus(math::Vec(0.f, 0.7f)).normalize();
+				t0 = rawP3.minus(rawP0).normalize().plus(math::Vec(0.f, 0.7f)).normalize();
 			}
 			else {
 				// Make sure tangent points towards next waypoint
-				if (t0.dot(p3.minus(p0)) < 0.f) t0 = t0.neg();
+				if (t0.dot(rawP3.minus(rawP0)) < 0.f) t0 = t0.neg();
 			}
 
 			if (w1.isPort) {
-				t1 = p3.minus(p0).normalize().plus(math::Vec(0.f, -0.7f)).normalize();
+				t1 = rawP3.minus(rawP0).normalize().plus(math::Vec(0.f, -0.7f)).normalize();
 			}
 			else {
-				if (t1.dot(p3.minus(p0)) < 0.f) t1 = t1.neg();
+				if (t1.dot(rawP3.minus(rawP0)) < 0.f) t1 = t1.neg();
 			}
 
-			math::Vec p1 = p0.plus(t0.mult(dist * 0.38f));
-			math::Vec p2 = p3.minus(t1.mult(dist * 0.38f));
+			math::Vec p1 = rawP0.plus(t0.mult(dist * 0.38f));
+			math::Vec p2 = rawP3.minus(t1.mult(dist * 0.38f));
 
 			// Tension / sag droop
 			float sag = (1.0f - settings::cableTension) * (18.0f + 0.12f * dist);
 			p1.y += sag;
 			p2.y += sag;
+
+			math::Vec p0 = rawP0;
+			math::Vec p3 = rawP3;
+
+			// Align output plug direction & start wire at exact tip of plug (14px from port center along p1 - outPos)
+			if (w0.isPort) {
+				math::Vec outVec = p1.minus(rawP0);
+				float outLen = outVec.norm();
+				math::Vec outDir = (outLen > 1e-3f) ? outVec.div(outLen) : math::Vec(0.f, 1.f);
+				if (outLen < 18.0f) {
+					p1 = rawP0.plus(outDir.mult(18.0f));
+				}
+				p0 = rawP0.plus(outDir.mult(14.0f));
+				setPlugRotation(cw->outputPlug, outDir.arg());
+			}
+
+			// Align input plug direction & end wire at exact tip of plug (14px from port center along p2 - inPos)
+			if (w1.isPort) {
+				math::Vec inVec = p2.minus(rawP3);
+				float inLen = inVec.norm();
+				math::Vec inDir = (inLen > 1e-3f) ? inVec.div(inLen) : math::Vec(0.f, 1.f);
+				if (inLen < 18.0f) {
+					p2 = rawP3.plus(inDir.mult(18.0f));
+				}
+				p3 = rawP3.plus(inDir.mult(14.0f));
+				setPlugRotation(cw->inputPlug, inDir.arg());
+			}
 
 			CableSegmentCurve curve;
 			curve.p0 = p0;
@@ -630,11 +647,12 @@ void HarnessOverlayWidget::drawLayer(const DrawArgs& args, int layer) {
 		nvgStrokeWidth(vg, thickness - 1.0f);
 
 		nvgBeginPath(vg);
-		for (const CableSegmentCurve& sc : cp.segments) {
-			math::Vec shP0 = sc.p0.plus(math::Vec(0.f, 30.f));
+		for (size_t s = 0; s < cp.segments.size(); ++s) {
+			const CableSegmentCurve& sc = cp.segments[s];
+			math::Vec shP0 = (s == 0) ? sc.p0 : sc.p0.plus(math::Vec(0.f, 30.f));
 			math::Vec shP1 = sc.p1.plus(math::Vec(0.f, 30.f));
 			math::Vec shP2 = sc.p2.plus(math::Vec(0.f, 30.f));
-			math::Vec shP3 = sc.p3.plus(math::Vec(0.f, 30.f));
+			math::Vec shP3 = (s + 1 == cp.segments.size()) ? sc.p3 : sc.p3.plus(math::Vec(0.f, 30.f));
 
 			nvgMoveTo(vg, shP0.x, shP0.y);
 			nvgBezierTo(vg, shP1.x, shP1.y, shP2.x, shP2.y, shP3.x, shP3.y);

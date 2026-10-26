@@ -66,6 +66,52 @@ inline std::string formatKeyCombo(int key, int mods) {
 	return s;
 }
 
+inline void setPlugRotation(app::PlugWidget* plug, float angle) {
+	if (!plug || plug->children.empty()) return;
+	widget::FramebufferWidget* fb = dynamic_cast<widget::FramebufferWidget*>(plug->children.front());
+	if (!fb || fb->children.empty()) return;
+	widget::TransformWidget* tw = dynamic_cast<widget::TransformWidget*>(fb->children.front());
+	if (!tw) return;
+
+	math::Vec center = tw->box.size.div(2.f);
+	float targetAngle = angle - 0.5f * float(M_PI);
+
+	float expected[6];
+	nvgTransformIdentity(expected);
+	float t[6];
+	nvgTransformTranslate(t, center.x, center.y);
+	nvgTransformPremultiply(expected, t);
+	nvgTransformRotate(t, targetAngle);
+	nvgTransformPremultiply(expected, t);
+	nvgTransformTranslate(t, -center.x, -center.y);
+	nvgTransformPremultiply(expected, t);
+
+	bool changed = false;
+	for (int i = 0; i < 6; ++i) {
+		if (std::fabs(tw->transform[i] - expected[i]) > 1e-4f) {
+			changed = true;
+			break;
+		}
+	}
+	if (changed) {
+		for (int i = 0; i < 6; ++i) {
+			tw->transform[i] = expected[i];
+		}
+		fb->setDirty();
+	}
+}
+
+inline void restoreCablePlugs(app::CableWidget* cw) {
+	if (!cw || !cw->isComplete()) return;
+	math::Vec outPos = cw->getOutputPos();
+	math::Vec inPos = cw->getInputPos();
+	float dist = outPos.minus(inPos).norm();
+	math::Vec slump = outPos.plus(inPos).div(2.f);
+	slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
+	setPlugRotation(cw->outputPlug, slump.minus(outPos).arg());
+	setPlugRotation(cw->inputPlug, slump.minus(inPos).arg());
+}
+
 struct ZipTieModule : engine::Module {
 	enum ParamIds {
 		PARAM_ARM_TOOL,
