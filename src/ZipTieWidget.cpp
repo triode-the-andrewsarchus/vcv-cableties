@@ -28,16 +28,21 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 		nvgFillColor(vg, nvgRGB(26, 30, 34));
 		nvgText(vg, cx + 0.5f, 25.0f, "ZIP-TIE", NULL);
 
-		// Terracotta model badge
+		// Terracotta subtitle badge ("Wire Harness")
+		const char* badgeText = "Wire Harness";
+		nvgFontSize(vg, 7.0f);
+		nvgTextLetterSpacing(vg, 0.5f);
+		float badgeBounds[4] = {0, 0, 0, 0};
+		nvgTextBounds(vg, 0, 0, badgeText, NULL, badgeBounds);
+		float badgeW = std::max(54.0f, (badgeBounds[2] - badgeBounds[0]) + 10.0f);
+
 		nvgBeginPath(vg);
-		nvgRoundedRect(vg, 13.0f, 32.5f, 64.0f, 9.0f, 1.5f);
+		nvgRoundedRect(vg, cx - badgeW * 0.5f, 32.2f, badgeW, 9.2f, 1.5f);
 		nvgFillColor(vg, nvgRGB(184, 58, 27));
 		nvgFill(vg);
 
-		nvgFontSize(vg, 6.8f);
-		nvgTextLetterSpacing(vg, 0.9f);
 		nvgFillColor(vg, nvgRGB(246, 245, 240));
-		nvgText(vg, cx + 0.4f, 37.2f, "NIM-406 HARNESS", NULL);
+		nvgText(vg, cx + 0.2f, 37.0f, badgeText, NULL);
 
 		// 2. Section 1 Header: Shortcut Tape
 		nvgFontSize(vg, 6.8f);

@@ -22,18 +22,6 @@
   <rect width="90" height="380" fill="url(#nimAluminum)" />
   <rect width="90" height="380" fill="url(#nimSheen)" />
 
-  <!-- Fine Horizontal Brushed Grain Lines (subtle) -->
-  <g stroke="#000000" stroke-opacity="0.03" stroke-width="0.5">
-    <line x1="0" y1="30" x2="90" y2="30" />
-    <line x1="0" y1="75" x2="90" y2="75" />
-    <line x1="0" y1="120" x2="90" y2="120" />
-    <line x1="0" y1="165" x2="90" y2="165" />
-    <line x1="0" y1="210" x2="90" y2="210" />
-    <line x1="0" y1="255" x2="90" y2="255" />
-    <line x1="0" y1="300" x2="90" y2="300" />
-    <line x1="0" y1="345" x2="90" y2="345" />
-  </g>
-
   <!-- Machined Edge Chamfers -->
   <line x1="0.5" y1="0" x2="0.5" y2="380" stroke="#eff1ed" stroke-width="1" />
   <line x1="89.5" y1="0" x2="89.5" y2="380" stroke="#8c908a" stroke-width="1" />
