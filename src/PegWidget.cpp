@@ -186,7 +186,121 @@ struct VerticalLinkButton : widget::OpaqueWidget {
 };
 
 // ============================================================================
-// 2. 2HP PEG PANEL TYPOGRAPHY, GUIDE CHANNEL & PEG GRAPHICS
+// 2. DRAGGABLE TURRET PEG HANDLE (Slide pegs up and down along the guide track)
+// ============================================================================
+struct DraggablePegHandle : widget::OpaqueWidget {
+	PegWidget* owner = nullptr;
+	bool isTopPeg = true;
+	bool isDragging = false;
+	bool isHovered = false;
+	float dragOffsetY = 0.0f;
+
+	DraggablePegHandle() {
+		box.size = math::Vec(18.0f, 18.0f);
+	}
+
+	void onEnter(const EnterEvent& e) override {
+		isHovered = true;
+		OpaqueWidget::onEnter(e);
+	}
+
+	void onLeave(const LeaveEvent& e) override {
+		isHovered = false;
+		OpaqueWidget::onLeave(e);
+	}
+
+	void onButton(const ButtonEvent& e) override {
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT && e.action == GLFW_PRESS) {
+			if (owner && owner->module && APP && APP->scene && APP->scene->rack) {
+				PegModule* m = dynamic_cast<PegModule*>(owner->module);
+				if (m) {
+					float curY = isTopPeg ? m->topPegY : m->botPegY;
+					float mouseModuleY = APP->scene->rack->getMousePos().y - owner->box.pos.y;
+					dragOffsetY = mouseModuleY - curY;
+					isDragging = true;
+				}
+			}
+			e.consume(this);
+			return;
+		}
+		OpaqueWidget::onButton(e);
+	}
+
+	void onDoubleClick(const DoubleClickEvent& e) override {
+		if (owner && owner->module) {
+			if (PegModule* m = dynamic_cast<PegModule*>(owner->module)) {
+				if (isTopPeg) {
+					m->topPegY = std::min(PegModule::DEFAULT_TOP_PEG_Y, m->botPegY - PegModule::MIN_PEG_GAP);
+				}
+				else {
+					m->botPegY = std::max(PegModule::DEFAULT_BOT_PEG_Y, m->topPegY + PegModule::MIN_PEG_GAP);
+				}
+			}
+		}
+		e.consume(this);
+	}
+
+	void onDragStart(const DragStartEvent& e) override {
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			isDragging = true;
+			e.consume(this);
+			return;
+		}
+		OpaqueWidget::onDragStart(e);
+	}
+
+	void onDragMove(const DragMoveEvent& e) override {
+		if (isDragging && owner && owner->module && APP && APP->scene && APP->scene->rack) {
+			PegModule* m = dynamic_cast<PegModule*>(owner->module);
+			if (m) {
+				float mouseModuleY = APP->scene->rack->getMousePos().y - owner->box.pos.y;
+				float targetY = mouseModuleY - dragOffsetY;
+
+				// Compute allowed vertical track limits
+				bool hasAboveBtn = owner->topLinkBtn && owner->topLinkBtn->visible;
+				bool hasBelowBtn = owner->botLinkBtn && owner->botLinkBtn->visible;
+				float minTrackY = hasAboveBtn ? 60.0f : 52.0f;
+				float maxTrackY = hasBelowBtn ? 326.0f : 340.0f;
+
+				if (isTopPeg) {
+					float maxTop = (m->linkedBelowId != -1) ? maxTrackY : (m->botPegY - PegModule::MIN_PEG_GAP);
+					m->topPegY = math::clamp(targetY, minTrackY, std::max(minTrackY, maxTop));
+				}
+				else {
+					float minBot = (m->linkedAboveId != -1) ? minTrackY : (m->topPegY + PegModule::MIN_PEG_GAP);
+					m->botPegY = math::clamp(targetY, std::min(maxTrackY, minBot), maxTrackY);
+				}
+			}
+			e.consume(this);
+			return;
+		}
+		OpaqueWidget::onDragMove(e);
+	}
+
+	void onDragEnd(const DragEndEvent& e) override {
+		isDragging = false;
+		OpaqueWidget::onDragEnd(e);
+	}
+
+	void draw(const DrawArgs& args) override {
+		if (!isHovered && !isDragging) return;
+		NVGcontext* vg = args.vg;
+		nvgSave(vg);
+		float cx = box.size.x * 0.5f;
+		float cy = box.size.y * 0.5f;
+
+		// Subtle interactive ring around peg when hovered/dragged
+		nvgBeginPath(vg);
+		nvgCircle(vg, cx, cy, 8.6f);
+		nvgStrokeColor(vg, isDragging ? nvgRGBA(255, 145, 70, 235) : nvgRGBA(255, 195, 140, 165));
+		nvgStrokeWidth(vg, isDragging ? 1.4f : 1.0f);
+		nvgStroke(vg);
+		nvgRestore(vg);
+	}
+};
+
+// ============================================================================
+// 3. 2HP PEG PANEL TYPOGRAPHY, GUIDE CHANNEL & PEG GRAPHICS
 // ============================================================================
 struct PegPanelGraphicsWidget : widget::TransparentWidget {
 	PegWidget* owner = nullptr;
@@ -345,31 +459,27 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 			nvgText(vg, cx + 0.2f, 35.2f, "GUARD", NULL);
 		}
 
-		// 2. Vertical Keep-Out Channel Strip between active pegs
-		// Stops cleanly at the mounting screw collar (y=16 / y=364) so it never runs through the screws
-		float trackTop = linkedAbove ? 16.5f : PegModule::TOP_PEG_Y;
-		float trackBot = linkedBelow ? (box.size.y - 16.5f) : PegModule::BOT_PEG_Y;
+		// 2. Vertical Keep-Out Channel Strip
+		// Full slide track groove is always visible along the panel; active tension line spans between the active pegs!
+		float slotTop = linkedAbove ? 16.5f : 50.0f;
+		float slotBot = linkedBelow ? (box.size.y - 16.5f) : 342.0f;
+		float curTopPegY = m ? m->topPegY : PegModule::DEFAULT_TOP_PEG_Y;
+		float curBotPegY = m ? m->botPegY : PegModule::DEFAULT_BOT_PEG_Y;
+		float activeTop = linkedAbove ? 16.5f : curTopPegY;
+		float activeBot = linkedBelow ? (box.size.y - 16.5f) : curBotPegY;
 
-		// Recessed machined guide slot
+		// Recessed machined slide track slot
 		nvgBeginPath(vg);
-		nvgRoundedRect(vg, cx - 2.5f, trackTop, 5.0f, trackBot - trackTop, 2.0f);
+		nvgRoundedRect(vg, cx - 2.5f, slotTop, 5.0f, slotBot - slotTop, 2.0f);
 		nvgFillColor(vg, dark ? nvgRGB(22, 25, 28) : nvgRGB(172, 176, 170));
 		nvgFill(vg);
 		nvgStrokeColor(vg, dark ? nvgRGB(55, 60, 68) : nvgRGB(130, 134, 128));
 		nvgStrokeWidth(vg, 0.8f);
 		nvgStroke(vg);
 
-		// Terracotta keep-out center tension line
-		nvgBeginPath(vg);
-		nvgMoveTo(vg, cx, trackTop + 1.0f);
-		nvgLineTo(vg, cx, trackBot - 1.0f);
-		nvgStrokeColor(vg, dark ? nvgRGBA(224, 86, 52, 210) : nvgRGBA(184, 58, 27, 200));
-		nvgStrokeWidth(vg, 1.6f);
-		nvgStroke(vg);
-
-		// Graduated tick marks along vertical keep-out channel
-		float tickStart = linkedAbove ? 46.0f : 78.0f;
-		float tickEnd   = linkedBelow ? 334.0f : 302.0f;
+		// Graduated tick marks along vertical slide track
+		float tickStart = linkedAbove ? 46.0f : 62.0f;
+		float tickEnd   = linkedBelow ? 334.0f : 330.0f;
 		nvgBeginPath(vg);
 		for (float y = tickStart; y <= tickEnd; y += 16.0f) {
 			nvgMoveTo(vg, cx - 5.5f, y);
@@ -380,6 +490,16 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 		nvgStrokeColor(vg, dark ? nvgRGBA(160, 168, 178, 120) : nvgRGBA(48, 52, 56, 120));
 		nvgStrokeWidth(vg, 0.8f);
 		nvgStroke(vg);
+
+		// Terracotta keep-out center tension line between active pegs
+		if (activeBot > activeTop) {
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, cx, activeTop);
+			nvgLineTo(vg, cx, activeBot);
+			nvgStrokeColor(vg, dark ? nvgRGBA(224, 86, 52, 215) : nvgRGBA(184, 58, 27, 205));
+			nvgStrokeWidth(vg, 1.6f);
+			nvgStroke(vg);
+		}
 
 		// 3. Horizontal Link Status Badges (if linked to Left or Right peg module)
 		if (linkedLeft || linkedRight) {
@@ -404,13 +524,13 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 			nvgText(vg, cx, midY + 5.0f, hLabel.c_str(), NULL);
 		}
 
-		// 4. Draw Top & Bottom Turret Pegs ONLY when active (removed cleanly when vertically linked!)
+		// 4. Draw Top & Bottom Turret Pegs at their dynamic draggable positions!
 		if (!linkedAbove) {
-			drawTurretPeg(vg, PegModule::PEG_X, PegModule::TOP_PEG_Y, dark);
+			drawTurretPeg(vg, PegModule::PEG_X, curTopPegY, dark);
 		}
 
 		if (!linkedBelow) {
-			drawTurretPeg(vg, PegModule::PEG_X, PegModule::BOT_PEG_Y, dark);
+			drawTurretPeg(vg, PegModule::PEG_X, curBotPegY, dark);
 		}
 
 		// 5. Bottom NIM-BIN Footer ("NIM · 2HP") — ONLY drawn when NOT linked below!
@@ -472,6 +592,21 @@ PegWidget::PegWidget(PegModule* module) {
 	botBtn->visible = false;
 	addChild(botBtn);
 	botLinkBtn = botBtn;
+
+	// Draggable Top & Bottom Peg Handles
+	DraggablePegHandle* topHandle = new DraggablePegHandle;
+	topHandle->owner = this;
+	topHandle->isTopPeg = true;
+	topHandle->box.pos = math::Vec(PegModule::PEG_X - 9.0f, PegModule::DEFAULT_TOP_PEG_Y - 9.0f);
+	addChild(topHandle);
+	topPegHandle = topHandle;
+
+	DraggablePegHandle* botHandle = new DraggablePegHandle;
+	botHandle->owner = this;
+	botHandle->isTopPeg = false;
+	botHandle->box.pos = math::Vec(PegModule::PEG_X - 9.0f, PegModule::DEFAULT_BOT_PEG_Y - 9.0f);
+	addChild(botHandle);
+	botPegHandle = botHandle;
 
 	if (module) {
 		HarnessOverlayWidget::acquire(this);
@@ -586,6 +721,27 @@ void PegWidget::step() {
 		if (botLinkBtn) {
 			botLinkBtn->visible = (belowNeighbor != nullptr);
 			botLinkBtn->box.pos.y = (m->linkedBelowId != -1) ? 344.5f : 335.5f;
+		}
+
+		// Sync draggable peg handle positions and visibility (hide handle when that peg is removed by vertical link)
+		bool hasAboveBtn = topLinkBtn && topLinkBtn->visible;
+		bool hasBelowBtn = botLinkBtn && botLinkBtn->visible;
+		float minTrackY = hasAboveBtn ? 60.0f : 52.0f;
+		float maxTrackY = hasBelowBtn ? 326.0f : 340.0f;
+		m->topPegY = math::clamp(m->topPegY, minTrackY, maxTrackY);
+		m->botPegY = math::clamp(m->botPegY, minTrackY, maxTrackY);
+		if (m->linkedAboveId == -1 && m->linkedBelowId == -1 && m->botPegY - m->topPegY < PegModule::MIN_PEG_GAP) {
+			m->botPegY = std::min(maxTrackY, m->topPegY + PegModule::MIN_PEG_GAP);
+			m->topPegY = std::max(minTrackY, m->botPegY - PegModule::MIN_PEG_GAP);
+		}
+
+		if (topPegHandle) {
+			topPegHandle->visible = (m->linkedAboveId == -1);
+			topPegHandle->box.pos = math::Vec(PegModule::PEG_X - topPegHandle->box.size.x * 0.5f, m->topPegY - topPegHandle->box.size.y * 0.5f);
+		}
+		if (botPegHandle) {
+			botPegHandle->visible = (m->linkedBelowId == -1);
+			botPegHandle->box.pos = math::Vec(PegModule::PEG_X - botPegHandle->box.size.x * 0.5f, m->botPegY - botPegHandle->box.size.y * 0.5f);
 		}
 
 		// 2. Validate horizontal same-row links (linkedLeftId & linkedRightId)

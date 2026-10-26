@@ -204,10 +204,10 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 
 		// Record active (non-removed) pegs for 3D cap overlay rendering
 		if (pm->linkedAboveId == -1) {
-			cachedActivePegs.push_back({pw->box.pos.plus(math::Vec(PegModule::PEG_X, PegModule::TOP_PEG_Y))});
+			cachedActivePegs.push_back({pw->box.pos.plus(math::Vec(PegModule::PEG_X, pm->topPegY))});
 		}
 		if (pm->linkedBelowId == -1) {
-			cachedActivePegs.push_back({pw->box.pos.plus(math::Vec(PegModule::PEG_X, PegModule::BOT_PEG_Y))});
+			cachedActivePegs.push_back({pw->box.pos.plus(math::Vec(PegModule::PEG_X, pm->botPegY))});
 		}
 	}
 
@@ -239,9 +239,10 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 		}
 
 		// Walk down from topW to bottom-most vertically linked PegWidget
+		PegModule* topM = dynamic_cast<PegModule*>(topW->module);
 		PegColumn col;
 		col.x = topW->box.pos.x + PegModule::PEG_X;
-		col.yTop = topW->box.pos.y + PegModule::TOP_PEG_Y;
+		col.yTop = topW->box.pos.y + (topM ? topM->topPegY : PegModule::DEFAULT_TOP_PEG_Y);
 		PegWidget* curW = topW;
 		guard = 0;
 		while (curW && guard++ < 32) {
@@ -249,9 +250,9 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 			if (visitedVert.count(cid)) break;
 			visitedVert.insert(cid);
 			col.memberIds.push_back(cid);
-			col.yBot = curW->box.pos.y + PegModule::BOT_PEG_Y;
-
 			PegModule* cm = dynamic_cast<PegModule*>(curW->module);
+			col.yBot = curW->box.pos.y + (cm ? cm->botPegY : PegModule::DEFAULT_BOT_PEG_Y);
+
 			if (!cm || cm->linkedBelowId == -1) break;
 			auto it = idToWidget.find(cm->linkedBelowId);
 			if (it == idToWidget.end()) break;

@@ -20,8 +20,13 @@ struct PegModule : engine::Module {
 	};
 
 	static constexpr float PEG_X = 15.0f;
-	static constexpr float TOP_PEG_Y = 58.0f;
-	static constexpr float BOT_PEG_Y = 322.0f;
+	static constexpr float DEFAULT_TOP_PEG_Y = 58.0f;
+	static constexpr float DEFAULT_BOT_PEG_Y = 322.0f;
+	static constexpr float MIN_PEG_GAP = 24.0f;
+
+	// Draggable peg positions along the vertical track (module-local Y coordinates)
+	float topPegY = DEFAULT_TOP_PEG_Y;
+	float botPegY = DEFAULT_BOT_PEG_Y;
 
 	// Module IDs of linked PegModules (-1 = not linked)
 	int64_t linkedAboveId = -1;
@@ -43,6 +48,8 @@ struct PegModule : engine::Module {
 
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
+		topPegY = DEFAULT_TOP_PEG_Y;
+		botPegY = DEFAULT_BOT_PEG_Y;
 		linkedAboveId = -1;
 		linkedBelowId = -1;
 		linkedLeftId = -1;
@@ -53,6 +60,8 @@ struct PegModule : engine::Module {
 
 	json_t* dataToJson() override {
 		json_t* rootJ = json_object();
+		json_object_set_new(rootJ, "topPegY", json_real(topPegY));
+		json_object_set_new(rootJ, "botPegY", json_real(botPegY));
 		json_object_set_new(rootJ, "linkedAboveId", json_integer(linkedAboveId));
 		json_object_set_new(rootJ, "linkedBelowId", json_integer(linkedBelowId));
 		json_object_set_new(rootJ, "linkedLeftId", json_integer(linkedLeftId));
@@ -63,6 +72,12 @@ struct PegModule : engine::Module {
 	}
 
 	void dataFromJson(json_t* rootJ) override {
+		json_t* topYJ = json_object_get(rootJ, "topPegY");
+		if (topYJ) topPegY = (float)json_number_value(topYJ);
+
+		json_t* botYJ = json_object_get(rootJ, "botPegY");
+		if (botYJ) botPegY = (float)json_number_value(botYJ);
+
 		json_t* aboveJ = json_object_get(rootJ, "linkedAboveId");
 		if (aboveJ) linkedAboveId = json_integer_value(aboveJ);
 
@@ -86,6 +101,8 @@ struct PegModule : engine::Module {
 struct PegWidget : app::ModuleWidget {
 	widget::Widget* topLinkBtn = nullptr;
 	widget::Widget* botLinkBtn = nullptr;
+	widget::Widget* topPegHandle = nullptr;
+	widget::Widget* botPegHandle = nullptr;
 
 	PegWidget(PegModule* module);
 	~PegWidget() override;
