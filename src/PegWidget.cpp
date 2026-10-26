@@ -533,21 +533,6 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 			drawTurretPeg(vg, PegModule::PEG_X, curBotPegY, dark);
 		}
 
-		// 5. Bottom NIM-BIN Footer ("NIM · 2HP") — ONLY drawn when NOT linked below!
-		if (!linkedBelow) {
-			nvgBeginPath(vg);
-			nvgMoveTo(vg, 2.5f, 352.0f);
-			nvgLineTo(vg, 27.5f, 352.0f);
-			nvgStrokeColor(vg, dark ? nvgRGB(61, 67, 74) : nvgRGB(43, 48, 53));
-			nvgStrokeWidth(vg, 0.8f);
-			nvgStroke(vg);
-
-			nvgFontSize(vg, 5.8f);
-			nvgTextLetterSpacing(vg, 0.8f);
-			nvgFillColor(vg, dark ? nvgRGB(145, 153, 164) : nvgRGB(42, 46, 50));
-			nvgText(vg, cx + 0.3f, 358.0f, "NIM · 2HP", NULL);
-		}
-
 		nvgRestore(vg);
 	}
 };
