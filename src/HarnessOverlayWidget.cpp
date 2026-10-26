@@ -765,7 +765,9 @@ void HarnessOverlayWidget::drawLayer(const DrawArgs& args, int layer) {
 		nvgFill(vg);
 
 		// Inner Bevel / Rim
-		nvgStrokeColor(vg, isHovered ? nvgRGBAf(0.3f, 0.7f, 1.0f, 0.9f) : nvgRGBAf(1.f, 1.f, 1.f, 0.55f));
+		bool isBlackTie = (z.color.r < 0.5f);
+		float rimAlpha = isBlackTie ? 0.22f : 0.55f;
+		nvgStrokeColor(vg, isHovered ? nvgRGBAf(0.3f, 0.7f, 1.0f, 0.9f) : nvgRGBAf(1.f, 1.f, 1.f, rimAlpha));
 		nvgStrokeWidth(vg, isHovered ? 1.5f : 1.0f);
 		nvgStroke(vg);
 

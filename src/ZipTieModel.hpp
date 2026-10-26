@@ -79,7 +79,7 @@ struct ZipTie {
 	std::vector<int64_t> cableIds;       // IDs of cables passing through this tie
 	NVGcolor color = nvgRGB(235, 238, 242); // Nylon white/gray band
 	float width = 7.0f;                  // Thickness of band along cable
-	float wireSpacing = 3.5f;            // Center-to-center spacing of wires
+	float wireSpacing = 6.0f;            // Center-to-center spacing of wires
 
 	// Calculated at render/update time
 	math::Vec tangent = math::Vec(1.f, 0.f);

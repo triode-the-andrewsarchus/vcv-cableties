@@ -8,12 +8,10 @@ ZipTieModule::ZipTieModule() {
 	config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
 	configButton(PARAM_ARM_TOOL, "Arm Tie Tool (Draw lines to tie without holding shortcut)");
-	configParam(PARAM_WIRE_SPACING, 2.0f, 6.0f, 3.5f, "Bundle Wire Spacing", " px");
-	configSwitch(PARAM_TIE_STYLE, 0.f, 3.f, 0.f, "Zip Tie Color Style", {
-		"White Nylon",
-		"Dark Carbon",
-		"Hi-Viz Yellow",
-		"Crimson"
+	configParam(PARAM_WIRE_SPACING, 2.0f, 6.0f, 6.0f, "Bundle Wire Spacing", " px");
+	configSwitch(PARAM_TIE_STYLE, 0.f, 1.f, 0.f, "Zip Tie Color", {
+		"Translucent (Default)",
+		"Black"
 	});
 	configButton(PARAM_SNIP_ALL, "Snip / Remove All Zip Ties");
 }
@@ -71,16 +69,10 @@ int ZipTieModule::addZipTie(math::Vec pos, const std::vector<int64_t>& cableIds,
 	// Style color
 	int style = (int)params[PARAM_TIE_STYLE].getValue();
 	if (style == 1) {
-		tie.color = nvgRGB(35, 38, 42); // Dark carbon
-	}
-	else if (style == 2) {
-		tie.color = nvgRGB(245, 220, 40); // Hi-viz yellow
-	}
-	else if (style == 3) {
-		tie.color = nvgRGB(230, 60, 50); // Crimson
+		tie.color = nvgRGB(28, 30, 34); // Black nylon
 	}
 	else {
-		tie.color = nvgRGB(235, 238, 242); // White nylon
+		tie.color = nvgRGBA(235, 238, 242, 200); // Translucent natural nylon
 	}
 
 	zipTies.push_back(tie);
@@ -174,10 +166,7 @@ void ZipTieModule::cleanDeadCables() {
 	// Keep wire spacing & style synced with module params
 	float currentSpacing = params[PARAM_WIRE_SPACING].getValue();
 	int style = (int)params[PARAM_TIE_STYLE].getValue();
-	NVGcolor styleColor = nvgRGB(235, 238, 242);
-	if (style == 1) styleColor = nvgRGB(35, 38, 42);
-	else if (style == 2) styleColor = nvgRGB(245, 220, 40);
-	else if (style == 3) styleColor = nvgRGB(230, 60, 50);
+	NVGcolor styleColor = (style == 1) ? nvgRGB(28, 30, 34) : nvgRGBA(235, 238, 242, 200);
 
 	for (ZipTie& z : zipTies) {
 		z.wireSpacing = currentSpacing;
