@@ -331,240 +331,266 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 		}
 	}
 
-	static bool pointInsideObstacle(math::Vec p, const KeepOutObstacle& obs, float pad = -2.0f) {
-		if (obs.isBox) {
-			return p.x > (obs.xMin - pad) && p.x < (obs.xMax + pad) &&
-			       p.y > (obs.yTop - pad) && p.y < (obs.yBot + pad);
-		}
-		else {
-			return std::fabs(p.x - obs.pegLeftX) < 7.5f &&
-			       p.y > (obs.pegTopY - 6.0f) && p.y < (obs.pegBotY + 6.0f);
-		}
+static bool pointInsideObstacle(math::Vec p, const KeepOutObstacle& obs, float pad = -2.0f) {
+	if (obs.isBox) {
+		return p.x > (obs.xMin - pad) && p.x < (obs.xMax + pad) &&
+		       p.y > (obs.yTop - pad) && p.y < (obs.yBot + pad);
 	}
+	else {
+		// 1D vertical barrier has zero interior area (unless a point is literally inside the 2HP peg column)
+		return std::fabs(p.x - obs.pegLeftX) < 5.0f &&
+		       p.y > (obs.pegTopY - 4.0f) && p.y < (obs.pegBotY + 4.0f);
+	}
+}
 
-	static bool segmentHitsObstacle(math::Vec a, math::Vec b, const KeepOutObstacle& obs, float shrink = 0.0f) {
-		float xMin = obs.xMin + shrink;
-		float xMax = obs.xMax - shrink;
-		float yTop = obs.yTop + shrink;
-		float yBot = obs.yBot - shrink;
+static bool segmentHitsObstacle(math::Vec a, math::Vec b, const KeepOutObstacle& obs, float shrink = 0.0f) {
+	float xMin = obs.xMin + shrink;
+	float xMax = obs.xMax - shrink;
+	float yTop = obs.yTop + shrink;
+	float yBot = obs.yBot - shrink;
 
-		if (!obs.isBox) {
-			// 1D vertical barrier segment at x = obs.pegLeftX, y in [yTop, yBot]
-			math::Vec p3(obs.pegLeftX, yTop);
-			math::Vec p4(obs.pegLeftX, yBot);
-			if (getLineIntersection(a, b, p3, p4)) return true;
-			// Also check if segment passes within peg radius of top or bottom peg
-			if (distPointToSegment(math::Vec(obs.pegLeftX, obs.pegTopY), a, b) < (9.5f - shrink)) return true;
-			if (distPointToSegment(math::Vec(obs.pegLeftX, obs.pegBotY), a, b) < (9.5f - shrink)) return true;
+	if (!obs.isBox) {
+		// 1D vertical barrier segment at x = obs.pegLeftX, y in [pegTopY, pegBotY]
+		// Notice: detour waypoints are placed at (pegLeftX, yTop) and (pegLeftX, yBot),
+		// which are outside [pegTopY, pegBotY] by PEG_CLEARANCE (11px), so detour segments
+		// touching the detour waypoints NEVER intersect the barrier segment [pegTopY, pegBotY]!
+		float barTop = obs.pegTopY + shrink;
+		float barBot = obs.pegBotY - shrink;
+		if (barBot <= barTop) return false;
+
+		// Ignore if an endpoint is already one of the detour waypoints for this barrier
+		if (std::fabs(a.x - obs.pegLeftX) < 0.5f && (std::fabs(a.y - obs.yTop) < 1.5f || std::fabs(a.y - obs.yBot) < 1.5f)) {
+			return false;
+		}
+		if (std::fabs(b.x - obs.pegLeftX) < 0.5f && (std::fabs(b.y - obs.yTop) < 1.5f || std::fabs(b.y - obs.yBot) < 1.5f)) {
 			return false;
 		}
 
-		// 2D Keep-Out Box [xMin, xMax] x [yTop, yBot]
-		// Trivial reject
-		if (std::max(a.x, b.x) < xMin || std::min(a.x, b.x) > xMax ||
-		    std::max(a.y, b.y) < yTop || std::min(a.y, b.y) > yBot) {
-			return false;
-		}
+		math::Vec p3(obs.pegLeftX, barTop);
+		math::Vec p4(obs.pegLeftX, barBot);
+		if (getLineIntersection(a, b, p3, p4)) return true;
 
-		// Check if midpoint or quarter-points are inside box
-		for (float f : {0.25f, 0.5f, 0.75f}) {
-			math::Vec pt = a.plus(b.minus(a).mult(f));
-			if (pt.x > xMin && pt.x < xMax && pt.y > yTop && pt.y < yBot) return true;
-		}
-
-		// Check intersection with the 4 edges of the box
-		math::Vec tl(xMin, yTop), tr(xMax, yTop), br(xMax, yBot), bl(xMin, yBot);
-		if (getLineIntersection(a, b, tl, tr)) return true;
-		if (getLineIntersection(a, b, tr, br)) return true;
-		if (getLineIntersection(a, b, br, bl)) return true;
-		if (getLineIntersection(a, b, bl, tl)) return true;
-
+		// Also check if segment passes through the physical top or bottom peg post (radius ~ 7.5px)
+		float pegR = std::max(2.0f, 7.5f - shrink);
+		if (distPointToSegment(math::Vec(obs.pegLeftX, obs.pegTopY), a, b) < pegR) return true;
+		if (distPointToSegment(math::Vec(obs.pegLeftX, obs.pegBotY), a, b) < pegR) return true;
 		return false;
 	}
 
-	static bool curveHitsObstacle(math::Vec p0, math::Vec p1, math::Vec p2, math::Vec p3, bool isQuad, const KeepOutObstacle& obs, float shrink = 0.0f) {
-		const int N = 16;
-		math::Vec prev = p0;
-		for (int i = 1; i <= N; ++i) {
-			float t = (float)i / (float)N;
-			math::Vec cur = isQuad ? evalQuadBezier(p0, p1, p3, t) : evalCubicBezier(p0, p1, p2, p3, t);
-			if (segmentHitsObstacle(prev, cur, obs, shrink)) return true;
-			prev = cur;
-		}
+	// 2D Keep-Out Box [xMin, xMax] x [yTop, yBot]
+	if (xMax <= xMin || yBot <= yTop) return false;
+
+	// Trivial reject
+	if (std::max(a.x, b.x) < xMin || std::min(a.x, b.x) > xMax ||
+	    std::max(a.y, b.y) < yTop || std::min(a.y, b.y) > yBot) {
 		return false;
 	}
 
-	// Compute detour waypoints around a single KeepOutObstacle for segment A -> B
-	static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, const KeepOutObstacle& obs, float extraMargin = 0.0f) {
-		std::vector<math::Vec> result;
+	// Check if midpoint or quarter-points are strictly inside the box interior
+	for (float f : {0.25f, 0.5f, 0.75f}) {
+		math::Vec pt = a.plus(b.minus(a).mult(f));
+		if (pt.x > xMin + 0.5f && pt.x < xMax - 0.5f && pt.y > yTop + 0.5f && pt.y < yBot - 0.5f) return true;
+	}
 
-		if (!obs.isBox) {
-			// 1D Vertical Barrier at x = obs.pegLeftX, y in [obs.yTop, obs.yBot]
-			float x = obs.pegLeftX;
-			math::Vec topW(x, obs.yTop - extraMargin);
-			math::Vec botW(x, obs.yBot + extraMargin);
+	// Shrink box slightly when testing edge intersections so segments running along the outer corners don't self-hit
+	float exMin = xMin + 0.8f;
+	float exMax = xMax - 0.8f;
+	float eyTop = yTop + 0.8f;
+	float eyBot = yBot - 0.8f;
+	if (exMax <= exMin || eyBot <= eyTop) return false;
 
-			float costTop = A.minus(topW).norm() + topW.minus(B).norm();
-			float costBot = A.minus(botW).norm() + botW.minus(B).norm();
-			result.push_back((costTop <= costBot) ? topW : botW);
-			return result;
-		}
+	math::Vec tl(exMin, eyTop), tr(exMax, eyTop), br(exMax, eyBot), bl(exMin, eyBot);
+	if (getLineIntersection(a, b, tl, tr)) return true;
+	if (getLineIntersection(a, b, tr, br)) return true;
+	if (getLineIntersection(a, b, br, bl)) return true;
+	if (getLineIntersection(a, b, bl, tl)) return true;
 
-		// 2D Keep-Out Box: consider candidate 1-corner and 2-corner paths around the 4 corners of the box
-		math::Vec corners[4] = {
-			math::Vec(obs.xMin - extraMargin, obs.yTop - extraMargin), // 0: TL
-			math::Vec(obs.xMax + extraMargin, obs.yTop - extraMargin), // 1: TR
-			math::Vec(obs.xMax + extraMargin, obs.yBot + extraMargin), // 2: BR
-			math::Vec(obs.xMin - extraMargin, obs.yBot + extraMargin)  // 3: BL
-		};
+	return false;
+}
 
-		float bestCost = 1e18f;
+static bool curveHitsObstacle(math::Vec p0, math::Vec p1, math::Vec p2, math::Vec p3, bool isQuad, const KeepOutObstacle& obs, float shrink = 0.0f) {
+	const int N = 16;
+	math::Vec prev = p0;
+	for (int i = 1; i <= N; ++i) {
+		float t = (float)i / (float)N;
+		math::Vec cur = isQuad ? evalQuadBezier(p0, p1, p3, t) : evalCubicBezier(p0, p1, p2, p3, t);
+		if (segmentHitsObstacle(prev, cur, obs, shrink)) return true;
+		prev = cur;
+	}
+	return false;
+}
 
-		// Test 1-corner detours
-		for (int c = 0; c < 4; ++c) {
-			math::Vec C = corners[c];
-			if (!segmentHitsObstacle(A, C, obs, 2.0f) && !segmentHitsObstacle(C, B, obs, 2.0f)) {
-				float cost = A.minus(C).norm() + C.minus(B).norm();
-				if (cost < bestCost) {
-					bestCost = cost;
-					result = {C};
-				}
-			}
-		}
+// Compute detour waypoints around a single KeepOutObstacle for segment A -> B
+static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, const KeepOutObstacle& obs, float extraMargin = 0.0f) {
+	std::vector<math::Vec> result;
 
-		// Test 2-corner detours along perimeter edges (adjacent corners)
-		int adjPairs[8][2] = {
-			{0, 1}, {1, 0}, // Top edge (TL <-> TR)
-			{3, 2}, {2, 3}, // Bottom edge (BL <-> BR)
-			{0, 3}, {3, 0}, // Left edge (TL <-> BL)
-			{1, 2}, {2, 1}  // Right edge (TR <-> BR)
-		};
-		for (int p = 0; p < 8; ++p) {
-			math::Vec C1 = corners[adjPairs[p][0]];
-			math::Vec C2 = corners[adjPairs[p][1]];
-			if (!segmentHitsObstacle(A, C1, obs, 2.0f) && !segmentHitsObstacle(C2, B, obs, 2.0f)) {
-				float cost = A.minus(C1).norm() + C1.minus(C2).norm() + C2.minus(B).norm();
-				if (cost < bestCost) {
-					bestCost = cost;
-					result = {C1, C2};
-				}
-			}
-		}
+	if (!obs.isBox) {
+		// 1D Vertical Barrier at x = obs.pegLeftX, y in [obs.yTop, obs.yBot]
+		float x = obs.pegLeftX;
+		math::Vec topW(x, obs.yTop - extraMargin);
+		math::Vec botW(x, obs.yBot + extraMargin);
 
-		// Fallback if neither 1-corner nor 2-corner passed strict check: pick shortest top or bottom 2-corner bridge
-		if (result.empty()) {
-			bool leftToRight = (A.x <= B.x);
-			std::vector<math::Vec> topBridge = leftToRight
-				? std::vector<math::Vec>{corners[0], corners[1]}
-				: std::vector<math::Vec>{corners[1], corners[0]};
-			std::vector<math::Vec> botBridge = leftToRight
-				? std::vector<math::Vec>{corners[3], corners[2]}
-				: std::vector<math::Vec>{corners[2], corners[3]};
-
-			float costTop = A.minus(topBridge[0]).norm() + topBridge[0].minus(topBridge[1]).norm() + topBridge[1].minus(B).norm();
-			float costBot = A.minus(botBridge[0]).norm() + botBridge[0].minus(botBridge[1]).norm() + botBridge[1].minus(B).norm();
-			result = (costTop <= costBot) ? topBridge : botBridge;
-		}
-
+		float costTop = A.minus(topW).norm() + topW.minus(B).norm();
+		float costBot = A.minus(botW).norm() + botW.minus(B).norm();
+		result.push_back((costTop <= costBot) ? topW : botW);
 		return result;
 	}
 
-	// Route a segment (from startPos to endPos) around all cachedObstacles.
-	// Returns detour points to insert between startPos and endPos.
-	// If the area is un-routable (endpoint inside an obstacle, or trapped after max passes), returns empty vector (routes straight through!).
-	static std::vector<math::Vec> routeSegmentAroundObstacles(
-		math::Vec startPos,
-		math::Vec endPos,
-		bool useQuadSlump,
-		const std::vector<KeepOutObstacle>& obstacles)
-	{
-		if (obstacles.empty()) return {};
+	// 2D Keep-Out Box: consider candidate 1-corner and 2-corner paths around the 4 corners of the box
+	math::Vec corners[4] = {
+		math::Vec(obs.xMin - extraMargin, obs.yTop - extraMargin), // 0: TL
+		math::Vec(obs.xMax + extraMargin, obs.yTop - extraMargin), // 1: TR
+		math::Vec(obs.xMax + extraMargin, obs.yBot + extraMargin), // 2: BR
+		math::Vec(obs.xMin - extraMargin, obs.yBot + extraMargin)  // 3: BL
+	};
 
-		// Filter out any obstacles that contain startPos or endPos (if a port/tie is inside a keep-out region, ignore that obstacle for this span)
-		std::vector<const KeepOutObstacle*> validObstacles;
-		validObstacles.reserve(obstacles.size());
-		for (const KeepOutObstacle& obs : obstacles) {
-			if (!pointInsideObstacle(startPos, obs, -2.0f) && !pointInsideObstacle(endPos, obs, -2.0f)) {
-				validObstacles.push_back(&obs);
+	float bestCost = 1e18f;
+
+	// Test 1-corner detours
+	for (int c = 0; c < 4; ++c) {
+		math::Vec C = corners[c];
+		if (!segmentHitsObstacle(A, C, obs, 1.5f) && !segmentHitsObstacle(C, B, obs, 1.5f)) {
+			float cost = A.minus(C).norm() + C.minus(B).norm();
+			if (cost < bestCost) {
+				bestCost = cost;
+				result = {C};
 			}
 		}
-		if (validObstacles.empty()) return {};
-
-		std::vector<math::Vec> pts = {startPos, endPos};
-		const int MAX_ITERS = 6;
-		bool anyInserted = false;
-		std::unordered_set<const KeepOutObstacle*> handledObstacles;
-
-		for (int iter = 0; iter < MAX_ITERS; ++iter) {
-			bool changed = false;
-			for (size_t s = 0; s + 1 < pts.size(); ++s) {
-				math::Vec A = pts[s];
-				math::Vec B = pts[s + 1];
-
-				// Find first unhandled obstacle hit by segment A -> B (including cable sag if first pass)
-				const KeepOutObstacle* hitObs = nullptr;
-				float bestDist = 1e18f;
-
-				for (const KeepOutObstacle* obs : validObstacles) {
-					if (handledObstacles.count(obs)) continue;
-					bool hit = false;
-					if (!anyInserted && useQuadSlump) {
-						float dist = A.minus(B).norm();
-						math::Vec slump = A.plus(B).div(2.f);
-						slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
-						hit = curveHitsObstacle(A, slump, slump, B, true, *obs, 0.0f);
-					}
-					else if (!anyInserted) {
-						float dist = A.minus(B).norm();
-						float sag = (1.0f - settings::cableTension) * (16.0f + 0.10f * dist);
-						math::Vec dir = B.minus(A).normalize();
-						math::Vec p1 = A.plus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
-						math::Vec p2 = B.minus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
-						hit = curveHitsObstacle(A, p1, p2, B, false, *obs, 0.0f);
-					}
-					else {
-						hit = segmentHitsObstacle(A, B, *obs, 2.0f);
-					}
-
-					if (hit) {
-						math::Vec obsCenter((obs->xMin + obs->xMax) * 0.5f, (obs->yTop + obs->yBot) * 0.5f);
-						float d = A.minus(obsCenter).norm();
-						if (d < bestDist) {
-							bestDist = d;
-							hitObs = obs;
-						}
-					}
-				}
-
-				if (hitObs) {
-					handledObstacles.insert(hitObs);
-					std::vector<math::Vec> detour = computeObstacleDetour(A, B, *hitObs);
-					if (!detour.empty()) {
-						pts.insert(pts.begin() + (s + 1), detour.begin(), detour.end());
-						anyInserted = true;
-						changed = true;
-						break;
-					}
-				}
-			}
-			if (!changed) break;
-		}
-
-		if (!anyInserted) return {};
-
-		// Un-routable check: Verify the resulting detour path doesn't cut through the core of any valid obstacle
-		for (size_t s = 0; s + 1 < pts.size(); ++s) {
-			for (const KeepOutObstacle* obs : validObstacles) {
-				if (segmentHitsObstacle(pts[s], pts[s + 1], *obs, 4.5f)) {
-					// Trapped / un-routable configuration -> ignore pegs and route straight through!
-					return {};
-				}
-			}
-		}
-
-		// Return interior detour points
-		return std::vector<math::Vec>(pts.begin() + 1, pts.end() - 1);
 	}
+
+	// Test 2-corner detours along perimeter edges (adjacent corners)
+	int adjPairs[8][2] = {
+		{0, 1}, {1, 0}, // Top edge (TL <-> TR)
+		{3, 2}, {2, 3}, // Bottom edge (BL <-> BR)
+		{0, 3}, {3, 0}, // Left edge (TL <-> BL)
+		{1, 2}, {2, 1}  // Right edge (TR <-> BR)
+	};
+	for (int p = 0; p < 8; ++p) {
+		math::Vec C1 = corners[adjPairs[p][0]];
+		math::Vec C2 = corners[adjPairs[p][1]];
+		if (!segmentHitsObstacle(A, C1, obs, 1.5f) && !segmentHitsObstacle(C2, B, obs, 1.5f)) {
+			float cost = A.minus(C1).norm() + C1.minus(C2).norm() + C2.minus(B).norm();
+			if (cost < bestCost) {
+				bestCost = cost;
+				result = {C1, C2};
+			}
+		}
+	}
+
+	// Fallback if neither 1-corner nor 2-corner passed strict check: pick shortest top or bottom 2-corner bridge
+	if (result.empty()) {
+		bool leftToRight = (A.x <= B.x);
+		std::vector<math::Vec> topBridge = leftToRight
+			? std::vector<math::Vec>{corners[0], corners[1]}
+			: std::vector<math::Vec>{corners[1], corners[0]};
+		std::vector<math::Vec> botBridge = leftToRight
+			? std::vector<math::Vec>{corners[3], corners[2]}
+			: std::vector<math::Vec>{corners[2], corners[3]};
+
+		float costTop = A.minus(topBridge[0]).norm() + topBridge[0].minus(topBridge[1]).norm() + topBridge[1].minus(B).norm();
+		float costBot = A.minus(botBridge[0]).norm() + botBridge[0].minus(botBridge[1]).norm() + botBridge[1].minus(B).norm();
+		result = (costTop <= costBot) ? topBridge : botBridge;
+	}
+
+	return result;
+}
+
+// Route a segment (from startPos to endPos) around all cachedObstacles.
+// Returns detour points to insert between startPos and endPos.
+// If the area is un-routable (endpoint inside a 2D keep-out box, or trapped inside conflicting 2D boxes), returns empty vector (routes straight through!).
+static std::vector<math::Vec> routeSegmentAroundObstacles(
+	math::Vec startPos,
+	math::Vec endPos,
+	bool useQuadSlump,
+	const std::vector<KeepOutObstacle>& obstacles)
+{
+	if (obstacles.empty()) return {};
+
+	// Filter out any obstacles that contain startPos or endPos (if a port/tie is inside a keep-out region, ignore that obstacle for this span)
+	std::vector<const KeepOutObstacle*> validObstacles;
+	validObstacles.reserve(obstacles.size());
+	for (const KeepOutObstacle& obs : obstacles) {
+		if (!pointInsideObstacle(startPos, obs, -2.0f) && !pointInsideObstacle(endPos, obs, -2.0f)) {
+			validObstacles.push_back(&obs);
+		}
+	}
+	if (validObstacles.empty()) return {};
+
+	std::vector<math::Vec> pts = {startPos, endPos};
+	const int MAX_ITERS = 8;
+	bool anyInserted = false;
+	std::unordered_set<const KeepOutObstacle*> handledObstacles;
+
+	for (int iter = 0; iter < MAX_ITERS; ++iter) {
+		bool changed = false;
+		for (size_t s = 0; s + 1 < pts.size(); ++s) {
+			math::Vec A = pts[s];
+			math::Vec B = pts[s + 1];
+
+			// Find first unhandled obstacle hit by segment A -> B (including cable sag if first pass)
+			const KeepOutObstacle* hitObs = nullptr;
+			float bestDist = 1e18f;
+
+			for (const KeepOutObstacle* obs : validObstacles) {
+				if (handledObstacles.count(obs)) continue;
+				bool hit = false;
+				if (!anyInserted && useQuadSlump) {
+					float dist = A.minus(B).norm();
+					math::Vec slump = A.plus(B).div(2.f);
+					slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
+					hit = curveHitsObstacle(A, slump, slump, B, true, *obs, 0.0f);
+				}
+				else if (!anyInserted) {
+					float dist = A.minus(B).norm();
+					float sag = (1.0f - settings::cableTension) * (16.0f + 0.10f * dist);
+					math::Vec dir = B.minus(A).normalize();
+					math::Vec p1 = A.plus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
+					math::Vec p2 = B.minus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
+					hit = curveHitsObstacle(A, p1, p2, B, false, *obs, 0.0f);
+				}
+				else {
+					hit = segmentHitsObstacle(A, B, *obs, 0.0f);
+				}
+
+				if (hit) {
+					math::Vec obsCenter((obs->xMin + obs->xMax) * 0.5f, (obs->yTop + obs->yBot) * 0.5f);
+					float d = A.minus(obsCenter).norm();
+					if (d < bestDist) {
+						bestDist = d;
+						hitObs = obs;
+					}
+				}
+			}
+
+			if (hitObs) {
+				handledObstacles.insert(hitObs);
+				std::vector<math::Vec> detour = computeObstacleDetour(A, B, *hitObs);
+				if (!detour.empty()) {
+					pts.insert(pts.begin() + (s + 1), detour.begin(), detour.end());
+					anyInserted = true;
+					changed = true;
+					break;
+				}
+			}
+		}
+		if (!changed) break;
+	}
+
+	if (!anyInserted) return {};
+
+	// Un-routable check: Only fall back if a detour waypoint itself lands inside the interior of another 2D Keep-Out Box
+	// (meaning two 2D keep-out boxes overlap/trap the corner so there is nowhere outside to place the wire)
+	for (size_t i = 1; i + 1 < pts.size(); ++i) {
+		for (const KeepOutObstacle* obs : validObstacles) {
+			if (obs->isBox && pointInsideObstacle(pts[i], *obs, -5.0f)) {
+				return {};
+			}
+		}
+	}
+
+	// Return interior detour points
+	return std::vector<math::Vec>(pts.begin() + 1, pts.end() - 1);
+}
 
 void HarnessOverlayWidget::step() {
 	// Process any pending clear request signaled lock-free by the audio thread or reset

@@ -29,6 +29,10 @@ struct PegModule : engine::Module {
 	int64_t linkedLeftId = -1;
 	int64_t linkedRightId = -1;
 
+	// Tracks when the user explicitly unlinked a vertically aligned neighbor via the button/menu
+	int64_t manualUnlinkAboveId = -1;
+	int64_t manualUnlinkBelowId = -1;
+
 	PegModule() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 	}
@@ -43,6 +47,8 @@ struct PegModule : engine::Module {
 		linkedBelowId = -1;
 		linkedLeftId = -1;
 		linkedRightId = -1;
+		manualUnlinkAboveId = -1;
+		manualUnlinkBelowId = -1;
 	}
 
 	json_t* dataToJson() override {
@@ -51,6 +57,8 @@ struct PegModule : engine::Module {
 		json_object_set_new(rootJ, "linkedBelowId", json_integer(linkedBelowId));
 		json_object_set_new(rootJ, "linkedLeftId", json_integer(linkedLeftId));
 		json_object_set_new(rootJ, "linkedRightId", json_integer(linkedRightId));
+		json_object_set_new(rootJ, "manualUnlinkAboveId", json_integer(manualUnlinkAboveId));
+		json_object_set_new(rootJ, "manualUnlinkBelowId", json_integer(manualUnlinkBelowId));
 		return rootJ;
 	}
 
@@ -66,6 +74,12 @@ struct PegModule : engine::Module {
 
 		json_t* rightJ = json_object_get(rootJ, "linkedRightId");
 		if (rightJ) linkedRightId = json_integer_value(rightJ);
+
+		json_t* manAboveJ = json_object_get(rootJ, "manualUnlinkAboveId");
+		if (manAboveJ) manualUnlinkAboveId = json_integer_value(manAboveJ);
+
+		json_t* manBelowJ = json_object_get(rootJ, "manualUnlinkBelowId");
+		if (manBelowJ) manualUnlinkBelowId = json_integer_value(manBelowJ);
 	}
 };
 

@@ -87,22 +87,34 @@ struct VerticalLinkButton : widget::OpaqueWidget {
 				if (m && neighborM) {
 					if (isTopEdge) {
 						if (m->linkedAboveId == neighborM->id) {
+							// Manually unlink
 							m->linkedAboveId = -1;
+							m->manualUnlinkAboveId = neighborM->id;
 							if (neighborM->linkedBelowId == m->id) neighborM->linkedBelowId = -1;
+							neighborM->manualUnlinkBelowId = m->id;
 						}
 						else {
+							// Re-link
 							m->linkedAboveId = neighborM->id;
+							m->manualUnlinkAboveId = -1;
 							neighborM->linkedBelowId = m->id;
+							neighborM->manualUnlinkBelowId = -1;
 						}
 					}
 					else {
 						if (m->linkedBelowId == neighborM->id) {
+							// Manually unlink
 							m->linkedBelowId = -1;
+							m->manualUnlinkBelowId = neighborM->id;
 							if (neighborM->linkedAboveId == m->id) neighborM->linkedAboveId = -1;
+							neighborM->manualUnlinkAboveId = m->id;
 						}
 						else {
+							// Re-link
 							m->linkedBelowId = neighborM->id;
+							m->manualUnlinkBelowId = -1;
 							neighborM->linkedAboveId = m->id;
+							neighborM->manualUnlinkAboveId = -1;
 						}
 					}
 				}
@@ -461,6 +473,14 @@ void PegWidget::step() {
 		PegWidget* aboveNeighbor = findVerticallyAlignedNeighbor(this, true);
 		PegWidget* belowNeighbor = findVerticallyAlignedNeighbor(this, false);
 
+		// Clear manual unlink state if the neighbor changed or moved away
+		if (!aboveNeighbor || aboveNeighbor->module->id != m->manualUnlinkAboveId) {
+			m->manualUnlinkAboveId = -1;
+		}
+		if (!belowNeighbor || belowNeighbor->module->id != m->manualUnlinkBelowId) {
+			m->manualUnlinkBelowId = -1;
+		}
+
 		// Validate linkedAboveId (auto-break if moved out of vertical alignment or deleted)
 		if (m->linkedAboveId != -1) {
 			if (!aboveNeighbor || aboveNeighbor->module->id != m->linkedAboveId) {
@@ -478,6 +498,14 @@ void PegWidget::step() {
 				}
 			}
 		}
+		else if (aboveNeighbor && aboveNeighbor->module) {
+			// Auto-link by default when vertically aligned unless manually unlinked!
+			auto* aboveM = dynamic_cast<PegModule*>(aboveNeighbor->module);
+			if (aboveM && m->manualUnlinkAboveId != aboveM->id && aboveM->manualUnlinkBelowId != m->id) {
+				m->linkedAboveId = aboveM->id;
+				aboveM->linkedBelowId = m->id;
+			}
+		}
 
 		// Validate linkedBelowId
 		if (m->linkedBelowId != -1) {
@@ -493,6 +521,14 @@ void PegWidget::step() {
 				if (auto* belowM = dynamic_cast<PegModule*>(belowNeighbor->module)) {
 					belowM->linkedAboveId = m->id;
 				}
+			}
+		}
+		else if (belowNeighbor && belowNeighbor->module) {
+			// Auto-link by default when vertically aligned unless manually unlinked!
+			auto* belowM = dynamic_cast<PegModule*>(belowNeighbor->module);
+			if (belowM && m->manualUnlinkBelowId != belowM->id && belowM->manualUnlinkAboveId != m->id) {
+				m->linkedBelowId = belowM->id;
+				belowM->linkedAboveId = m->id;
 			}
 		}
 
@@ -666,17 +702,21 @@ void PegWidget::appendContextMenu(ui::Menu* menu) {
 						if (PegWidget* aw = findPegWidgetById(aboveId)) {
 							if (auto* am = dynamic_cast<PegModule*>(aw->module)) {
 								if (am->linkedBelowId == m->id) am->linkedBelowId = -1;
+								am->manualUnlinkBelowId = m->id;
 							}
 						}
 						m->linkedAboveId = -1;
+						m->manualUnlinkAboveId = aboveId;
 					}
 					else {
 						if (PegWidget* aw = findPegWidgetById(aboveId)) {
 							if (auto* am = dynamic_cast<PegModule*>(aw->module)) {
 								am->linkedBelowId = m->id;
+								am->manualUnlinkBelowId = -1;
 							}
 						}
 						m->linkedAboveId = aboveId;
+						m->manualUnlinkAboveId = -1;
 					}
 				}
 			));
@@ -692,17 +732,21 @@ void PegWidget::appendContextMenu(ui::Menu* menu) {
 						if (PegWidget* bw = findPegWidgetById(belowId)) {
 							if (auto* bm = dynamic_cast<PegModule*>(bw->module)) {
 								if (bm->linkedAboveId == m->id) bm->linkedAboveId = -1;
+								bm->manualUnlinkAboveId = m->id;
 							}
 						}
 						m->linkedBelowId = -1;
+						m->manualUnlinkBelowId = belowId;
 					}
 					else {
 						if (PegWidget* bw = findPegWidgetById(belowId)) {
 							if (auto* bm = dynamic_cast<PegModule*>(bw->module)) {
 								bm->linkedAboveId = m->id;
+								bm->manualUnlinkAboveId = -1;
 							}
 						}
 						m->linkedBelowId = belowId;
+						m->manualUnlinkBelowId = -1;
 					}
 				}
 			));
