@@ -1156,31 +1156,22 @@ struct ZipTieWidget : app::ModuleWidget {
 		mollyBtn->box.size = math::Vec(58, 46);
 		addChild(mollyBtn);
 
-		// Setup Harness Overlay on Rack
+		// Setup Shared Harness Overlay on Rack
 		if (module && APP && APP->scene && APP->scene->rack) {
-			overlayWidget = new HarnessOverlayWidget;
-			overlayWidget->module = module;
-			overlayWidget->ownerMw = this;
-			APP->scene->rack->addChild(overlayWidget);
-
-			// Ensure overlay is positioned right after cableContainer so it renders on top
-			std::list<widget::Widget*>::iterator it;
-			for (it = APP->scene->rack->children.begin(); it != APP->scene->rack->children.end(); ++it) {
-				if (*it == APP->scene->rack->getCableContainer()) break;
-			}
-			if (it != APP->scene->rack->children.end()) {
-				++it;
-				APP->scene->rack->children.splice(it, APP->scene->rack->children, --APP->scene->rack->children.end());
-			}
+			overlayWidget = HarnessOverlayWidget::acquire(this);
 		}
 	}
 
 	~ZipTieWidget() override {
-		if (overlayWidget && APP && APP->scene && APP->scene->rack) {
-			APP->scene->rack->removeChild(overlayWidget);
-			delete overlayWidget;
-			overlayWidget = nullptr;
+		HarnessOverlayWidget::release(this);
+		overlayWidget = nullptr;
+	}
+
+	void step() override {
+		if (module && !overlayWidget && APP && APP->scene && APP->scene->rack) {
+			overlayWidget = HarnessOverlayWidget::acquire(this);
 		}
+		ModuleWidget::step();
 	}
 
 	void appendContextMenu(ui::Menu* menu) override {

@@ -21,6 +21,15 @@
         "Utility",
         "Visual"
       ]
+    },
+    {
+      "slug": "CablePegs",
+      "name": "Cable Pegs",
+      "description": "2HP cable routing pegs and linkable multi-row/horizontal keep-out barrier",
+      "tags": [
+        "Utility",
+        "Visual"
+      ]
     }
   ]
 }

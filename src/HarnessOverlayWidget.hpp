@@ -2,8 +2,11 @@
 #include <rack.hpp>
 #include "ZipTieModel.hpp"
 #include "ZipTieModule.hpp"
+#include "PegModule.hpp"
 #include <vector>
 #include <map>
+#include <set>
+#include <unordered_set>
 
 namespace ZipTies {
 
@@ -16,9 +19,28 @@ struct IntersectedCableInfo {
 	int segmentIndex = 0; // Which segment of the cable was intersected
 };
 
+struct KeepOutObstacle {
+	bool isBox = false;
+	float xMin = 0.f;
+	float xMax = 0.f;
+	float yTop = 0.f;
+	float yBot = 0.f;
+
+	// Visual peg center positions (before deflection clearance margin)
+	float pegLeftX = 0.f;
+	float pegRightX = 0.f;
+	float pegTopY = 0.f;
+	float pegBotY = 0.f;
+};
+
+struct ActivePegCap {
+	math::Vec pos;
+};
+
 struct HarnessOverlayWidget : widget::TransparentWidget {
 	ZipTieModule* module = nullptr;
 	app::ModuleWidget* ownerMw = nullptr;
+	std::set<app::ModuleWidget*> registeredWidgets;
 
 	// Dragging cut line state
 	bool isCutting = false;
@@ -31,9 +53,15 @@ struct HarnessOverlayWidget : widget::TransparentWidget {
 	math::Vec dragOffset;
 	int hoveredTieId = -1;
 
-	// Cached cable paths for efficient drawing and intersection
+	// Cached cable paths & keep-out obstacles for efficient drawing and intersection
 	std::vector<CablePath> cachedTiedPaths;
 	std::vector<CablePath> cachedUntiedPaths;
+	std::unordered_set<int64_t> deflectedUntiedCableIds;
+	std::vector<KeepOutObstacle> cachedObstacles;
+	std::vector<ActivePegCap> cachedActivePegs;
+
+	static HarnessOverlayWidget* acquire(app::ModuleWidget* mw);
+	static void release(app::ModuleWidget* mw);
 
 	HarnessOverlayWidget();
 	~HarnessOverlayWidget() override;
@@ -51,6 +79,7 @@ struct HarnessOverlayWidget : widget::TransparentWidget {
 
 	bool handleKeyLearn(int key, int action, int mods);
 	bool isShortcutActive(int mods = 0) const;
+	void buildKeepOutObstacles();
 	void updateCablePaths(const std::unordered_map<int64_t, app::CableWidget*>& activeCables);
 	void updateCutIntersections();
 };

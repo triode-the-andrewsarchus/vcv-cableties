@@ -7,4 +7,5 @@ extern Plugin* pluginInstance;
 
 namespace ZipTies {
 extern Model* modelZipTie;
+extern Model* modelCablePegs;
 }

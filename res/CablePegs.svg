@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="380" viewBox="0 0 30 380">
+  <defs>
+    <!-- Brushed Anodized Aluminum NIM-BIN Base -->
+    <linearGradient id="nimAluminum" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c9ccc6" />
+      <stop offset="20%" stop-color="#d8dbd5" />
+      <stop offset="50%" stop-color="#d0d3cd" />
+      <stop offset="80%" stop-color="#dadbd5" />
+      <stop offset="100%" stop-color="#c2c5bf" />
+    </linearGradient>
+
+    <!-- Subtle Vertical Brushed Sheen -->
+    <linearGradient id="nimSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
+      <stop offset="50%" stop-color="#000000" stop-opacity="0.0" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.08" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main Brushed Aluminum Faceplate -->
+  <rect width="30" height="380" fill="url(#nimAluminum)" />
+  <rect width="30" height="380" fill="url(#nimSheen)" />
+
+  <!-- Machined Edge Chamfers -->
+  <line x1="0.5" y1="0" x2="0.5" y2="380" stroke="#eff1ed" stroke-width="1" />
+  <line x1="29.5" y1="0" x2="29.5" y2="380" stroke="#8c908a" stroke-width="1" />
+  <line x1="0" y1="0.5" x2="30" y2="0.5" stroke="#eff1ed" stroke-width="1" />
+  <line x1="0" y1="379.5" x2="30" y2="379.5" stroke="#7a7e78" stroke-width="1" />
+
+  <!-- NIM-BIN Outer Technical Frame -->
+  <rect x="2.5" y="16.5" width="25" height="347" rx="1.2" fill="none" stroke="#2b3035" stroke-width="1.0" />
+
+  <!-- Top Accent Rule under Header -->
+  <line x1="2.5" y1="42.0" x2="27.5" y2="42.0" stroke="#b83a1b" stroke-width="1.5" />
+
+  <!-- Bottom Accent Rule above Footer -->
+  <line x1="2.5" y1="352.0" x2="27.5" y2="352.0" stroke="#2b3035" stroke-width="0.8" />
+</svg>

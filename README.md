@@ -28,8 +28,14 @@ A VCV Rack v2 utility module that modifies cable behavior, enabling users to bun
   - **Snip / Remove**: Right-click any zip tie to remove it, releasing the cables.
   - **Snip All**: Front-panel button and context menu action to clear all zip ties at once.
 - **Customizable Appearance**:
-  - **Wire Spacing Knob**: Adjust bundle ribbon spacing (2.0 px to 6.0 px).
-  - **Tie Styles**: White Nylon, Dark Carbon, Hi-Viz Yellow, and Crimson.
+  - **Wire Spacing Knob**: Adjust bundle ribbon spacing (2.0 px to 6.0 px) with a live 3-wire harness preview.
+  - **Tie Styles**: Translucent Nylon (Default) and Black.
+  - **Light & Dark NIM-BIN Panels**: Automatically adapts to VCV Rack's global *"Use dark panels if available"* option.
+- **2HP Cable Pegs (`CablePegs`) Keep-Out Module**:
+  - **Automatic Wire & Bundle Deflection**: A 2HP companion module with top and bottom turret pegs that deflect any individual cable or zip-tied wire bundle that would cross between the pegs.
+  - **Horizontal Keep-Out Linking**: Place two **Cable Pegs** modules on either side of a module with a screen or analyzer, right-click one, and choose **Link to Left Peg Module** or **Link to Right Peg Module** to form a 2D keep-out zone over the protected module.
+  - **Multi-Row Vertical Linking**: When two **Cable Pegs** modules are aligned vertically on adjacent rack rows, a **LINK** button appears on the panel; linking them visually removes the inner shared pegs (bottom peg of top module, top peg of bottom module) to create a continuous multi-row keep-out barrier.
+  - **Un-routable Fallback**: If an area is completely un-routable due to peg placement, cables safely ignore the blocking pegs and route straight through.
 - **Full Patch Persistence**:
   - All zip ties, positions, and harness topologies are serialized into patch JSON (`dataToJson` / `dataFromJson`).
   - Automatic cleanup when cables or modules are deleted or disconnected.
