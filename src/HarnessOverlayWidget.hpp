@@ -51,7 +51,7 @@ struct HarnessOverlayWidget : widget::TransparentWidget {
 
 	bool handleKeyLearn(int key, int action, int mods);
 	bool isShortcutActive(int mods = 0) const;
-	void updateCablePaths();
+	void updateCablePaths(const std::unordered_map<int64_t, app::CableWidget*>& activeCables);
 	void updateCutIntersections();
 };
 

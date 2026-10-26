@@ -31,7 +31,7 @@ ZipTieModule::~ZipTieModule() {
 
 void ZipTieModule::onReset(const ResetEvent& e) {
 	Module::onReset(e);
-	clearAllZipTies();
+	clearRequested.store(true, std::memory_order_relaxed);
 	toolArmed = false;
 	learningKey = false;
 	pendingMods = 0;
@@ -40,9 +40,9 @@ void ZipTieModule::onReset(const ResetEvent& e) {
 }
 
 void ZipTieModule::process(const ProcessArgs& args) {
-	// Check Snip All button
+	// Lock-free, allocation-free audio thread: signal UI thread if Snip All is triggered
 	if (snipTrigger.process(params[PARAM_SNIP_ALL].getValue() > 0.5f)) {
-		clearAllZipTies();
+		clearRequested.store(true, std::memory_order_relaxed);
 	}
 
 	// Check Arm Tool button
@@ -52,10 +52,6 @@ void ZipTieModule::process(const ProcessArgs& args) {
 
 	// Update light
 	lights[LIGHT_ARMED].setBrightness(toolArmed ? 1.0f : 0.0f);
-
-	// Update cached counts
-	cachedTieCount = (int)zipTies.size();
-	cachedWireCount = (int)cableTieSequences.size();
 }
 
 int ZipTieModule::addZipTie(math::Vec pos, const std::vector<int64_t>& cableIds, const std::map<int64_t, int>& insertPositions) {
@@ -162,8 +158,7 @@ void ZipTieModule::clearAllZipTies() {
 	cachedWireCount = 0;
 }
 
-void ZipTieModule::cleanDeadCables() {
-	if (!APP || !APP->scene || !APP->scene->rack || !APP->engine) return;
+void ZipTieModule::cleanDeadCables(const std::unordered_map<int64_t, app::CableWidget*>& activeCables) {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 
 	// Keep wire spacing & style synced with module params
@@ -179,9 +174,7 @@ void ZipTieModule::cleanDeadCables() {
 	std::vector<int64_t> deadCables;
 	for (auto& pair : cableTieSequences) {
 		int64_t cid = pair.first;
-		app::CableWidget* cw = APP->scene->rack->getCable(cid);
-		engine::Cable* ec = APP->engine->getCable(cid);
-		if (!cw && !ec) {
+		if (activeCables.find(cid) == activeCables.end()) {
 			deadCables.push_back(cid);
 		}
 	}

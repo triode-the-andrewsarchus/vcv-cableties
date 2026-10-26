@@ -136,6 +136,11 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 // ============================================================================
 struct ScotchTapeWidget : widget::TransparentWidget {
 	ZipTieModule* module = nullptr;
+	std::string fontPath;
+
+	ScotchTapeWidget() {
+		fontPath = asset::plugin(pluginInstance, "res/fonts/PermanentMarker-Regular.ttf");
+	}
 
 	void draw(const DrawArgs& args) override {
 		NVGcontext* vg = args.vg;
@@ -240,8 +245,7 @@ struct ScotchTapeWidget : widget::TransparentWidget {
 			}
 		}
 
-		std::shared_ptr<window::Font> markerFont = APP->window->loadFont(
-			asset::plugin(pluginInstance, "res/fonts/PermanentMarker-Regular.ttf"));
+		std::shared_ptr<window::Font> markerFont = APP->window->loadFont(fontPath);
 		if (markerFont && markerFont->handle >= 0) {
 			nvgFontFaceId(vg, markerFont->handle);
 		}

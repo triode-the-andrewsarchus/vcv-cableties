@@ -1,7 +1,9 @@
 #pragma once
 #include <rack.hpp>
 #include "ZipTieModel.hpp"
+#include <atomic>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <mutex>
 
@@ -143,12 +145,13 @@ struct ZipTieModule : engine::Module {
 	bool learningKey = false;
 	int pendingMods = 0;
 
-	// UI triggers
+	// UI triggers & lock-free audio->UI handoff
 	dsp::BooleanTrigger snipTrigger;
 	dsp::BooleanTrigger armTrigger;
 	bool toolArmed = false;
+	std::atomic<bool> clearRequested{false};
 
-	// Cached statistics
+	// Cached statistics (UI thread)
 	int cachedTieCount = 0;
 	int cachedWireCount = 0;
 
@@ -174,7 +177,7 @@ struct ZipTieModule : engine::Module {
 	void removeZipTie(int tieId);
 	void moveZipTie(int tieId, math::Vec newPos);
 	void clearAllZipTies();
-	void cleanDeadCables();
+	void cleanDeadCables(const std::unordered_map<int64_t, app::CableWidget*>& activeCables);
 	bool isCableTied(int64_t cableId) const;
 	const ZipTie* getZipTie(int tieId) const;
 

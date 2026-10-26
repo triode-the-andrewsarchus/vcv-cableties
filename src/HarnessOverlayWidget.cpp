@@ -116,21 +116,27 @@ void HarnessOverlayWidget::onSelectKey(const SelectKeyEvent& e) {
 void HarnessOverlayWidget::step() {
 	if (!module) return;
 
+	// Process any pending clear request signaled lock-free by the audio thread or reset
+	if (module->clearRequested.exchange(false, std::memory_order_relaxed)) {
+		module->clearAllZipTies();
+	}
+
 	// Keep overlay matched to rack dimensions
 	if (APP && APP->scene && APP->scene->rack) {
 		box.pos = math::Vec(0, 0);
 		box.size = APP->scene->rack->box.size;
 	}
 
-	// Clean any unplugged/deleted cables
-	module->cleanDeadCables();
-
-	// Ensure tied cables are hidden from Rack's default renderer
-	// and untied cables are visible
+	// Build O(1) lookup map of complete cables once per UI step and sync visibility
+	std::unordered_map<int64_t, app::CableWidget*> activeCables;
 	if (APP && APP->scene && APP->scene->rack) {
-		for (app::CableWidget* cw : APP->scene->rack->getCompleteCables()) {
-			if (!cw->cable) continue;
-			bool tied = module->isCableTied(cw->cable->id);
+		std::vector<app::CableWidget*> completeCables = APP->scene->rack->getCompleteCables();
+		activeCables.reserve(completeCables.size());
+		for (app::CableWidget* cw : completeCables) {
+			if (!cw || !cw->cable) continue;
+			int64_t cid = cw->cable->id;
+			activeCables[cid] = cw;
+			bool tied = module->isCableTied(cid);
 			if (tied) {
 				if (cw->visible) cw->visible = false;
 			}
@@ -140,8 +146,11 @@ void HarnessOverlayWidget::step() {
 		}
 	}
 
-	// Update cached geometry for all paths
-	updateCablePaths();
+	// Clean any unplugged/deleted cables without locking the audio engine
+	module->cleanDeadCables(activeCables);
+
+	// Update cached geometry for paths
+	updateCablePaths(activeCables);
 
 	// If cutting, update current mouse position and intersections
 	if (isCutting && APP && APP->scene && APP->scene->rack) {
@@ -164,12 +173,17 @@ void HarnessOverlayWidget::step() {
 	TransparentWidget::step();
 }
 
-void HarnessOverlayWidget::updateCablePaths() {
+void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, app::CableWidget*>& activeCables) {
 	cachedTiedPaths.clear();
 	cachedUntiedPaths.clear();
 	if (!module || !APP || !APP->scene || !APP->scene->rack) return;
 
 	std::lock_guard<std::recursive_mutex> lock(module->stateMutex);
+
+	auto findCable = [&](int64_t cid) -> app::CableWidget* {
+		auto it = activeCables.find(cid);
+		return (it != activeCables.end()) ? it->second : nullptr;
+	};
 
 	// STEP 1: Compute Tangent, Normal, and Ordered Wires for each Zip Tie
 	for (ZipTie& z : module->zipTies) {
@@ -179,7 +193,7 @@ void HarnessOverlayWidget::updateCablePaths() {
 		int outCount = 0;
 
 		for (int64_t cid : z.cableIds) {
-			app::CableWidget* cw = APP->scene->rack->getCable(cid);
+			app::CableWidget* cw = findCable(cid);
 			if (!cw || !cw->isComplete()) continue;
 
 			auto it = module->cableTieSequences.find(cid);
@@ -236,8 +250,8 @@ void HarnessOverlayWidget::updateCablePaths() {
 		// Order cables across normal to keep parallel ribbon untwisted
 		z.orderedCableIds = z.cableIds;
 		std::sort(z.orderedCableIds.begin(), z.orderedCableIds.end(), [&](int64_t a, int64_t b) {
-			app::CableWidget* cwa = APP->scene->rack->getCable(a);
-			app::CableWidget* cwb = APP->scene->rack->getCable(b);
+			app::CableWidget* cwa = findCable(a);
+			app::CableWidget* cwb = findCable(b);
 			if (!cwa || !cwb) return a < b;
 			math::Vec pa = cwa->getOutputPos();
 			math::Vec pb = cwb->getOutputPos();
@@ -251,7 +265,7 @@ void HarnessOverlayWidget::updateCablePaths() {
 	for (const auto& pair : module->cableTieSequences) {
 		int64_t cid = pair.first;
 		const auto& seq = pair.second;
-		app::CableWidget* cw = APP->scene->rack->getCable(cid);
+		app::CableWidget* cw = findCable(cid);
 		if (!cw || !cw->isComplete() || seq.empty()) continue;
 
 		CablePath cp;
@@ -263,6 +277,7 @@ void HarnessOverlayWidget::updateCablePaths() {
 
 		// Collect all waypoints and tangents for this cable
 		std::vector<Waypoint> waypoints;
+		waypoints.reserve(seq.size() + 2);
 
 		// Start at Output Port
 		waypoints.push_back(Waypoint(outPos, math::Vec(0, 1.f), true));
@@ -359,53 +374,61 @@ void HarnessOverlayWidget::updateCablePaths() {
 			curve.isQuad = false;
 			cp.segments.push_back(curve);
 
-			// Sample segment for intersection hit-testing
-			const int NUM_SAMPLES = 25;
-			for (int k = 0; k <= NUM_SAMPLES; k++) {
-				float t = (float)k / (float)NUM_SAMPLES;
-				math::Vec pt = evalCubicBezier(p0, p1, p2, p3, t);
-				cp.sampledPoints.push_back(pt);
-				cp.sampleSegmentIndices.push_back((int)s);
+			// Only sample segments when the user is actively slicing wires
+			if (isCutting) {
+				const int NUM_SAMPLES = 25;
+				for (int k = 0; k <= NUM_SAMPLES; k++) {
+					float t = (float)k / (float)NUM_SAMPLES;
+					math::Vec pt = evalCubicBezier(p0, p1, p2, p3, t);
+					cp.sampledPoints.push_back(pt);
+					cp.sampleSegmentIndices.push_back((int)s);
+				}
 			}
 		}
 
 		cachedTiedPaths.push_back(cp);
 	}
 
-	// STEP 3: Compute Paths for Untied Cables (for cutting hit-testing)
-	for (app::CableWidget* cw : APP->scene->rack->getCompleteCables()) {
-		if (!cw->cable) continue;
-		if (module->isCableTied(cw->cable->id)) continue;
+	// STEP 3: Compute Paths for Untied Cables ONLY when actively slicing
+	if (isCutting) {
+		for (const auto& kv : activeCables) {
+			int64_t cid = kv.first;
+			app::CableWidget* cw = kv.second;
+			if (!cw || !cw->cable) continue;
+			if (module->isCableTied(cid)) continue;
 
-		CablePath cp;
-		cp.cableId = cw->cable->id;
-		cp.cw = cw;
+			CablePath cp;
+			cp.cableId = cid;
+			cp.cw = cw;
 
-		math::Vec outPos = cw->getOutputPos();
-		math::Vec inPos = cw->getInputPos();
-		float dist = outPos.minus(inPos).norm();
-		math::Vec slump = outPos.plus(inPos).div(2.f);
-		slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
+			math::Vec outPos = cw->getOutputPos();
+			math::Vec inPos = cw->getInputPos();
+			float dist = outPos.minus(inPos).norm();
+			math::Vec slump = outPos.plus(inPos).div(2.f);
+			slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
 
-		outPos = outPos.plus(slump.minus(outPos).normalize().mult(14.f));
-		inPos = inPos.plus(slump.minus(inPos).normalize().mult(14.f));
+			outPos = outPos.plus(slump.minus(outPos).normalize().mult(14.f));
+			inPos = inPos.plus(slump.minus(inPos).normalize().mult(14.f));
 
-		CableSegmentCurve curve;
-		curve.p0 = outPos;
-		curve.qControl = slump;
-		curve.p3 = inPos;
-		curve.isQuad = true;
-		cp.segments.push_back(curve);
+			CableSegmentCurve curve;
+			curve.p0 = outPos;
+			curve.qControl = slump;
+			curve.p3 = inPos;
+			curve.isQuad = true;
+			cp.segments.push_back(curve);
 
-		const int NUM_SAMPLES = 30;
-		for (int k = 0; k <= NUM_SAMPLES; k++) {
-			float t = (float)k / (float)NUM_SAMPLES;
-			math::Vec pt = evalQuadBezier(outPos, slump, inPos, t);
-			cp.sampledPoints.push_back(pt);
-			cp.sampleSegmentIndices.push_back(0);
+			const int NUM_SAMPLES = 30;
+			cp.sampledPoints.reserve(NUM_SAMPLES + 1);
+			cp.sampleSegmentIndices.reserve(NUM_SAMPLES + 1);
+			for (int k = 0; k <= NUM_SAMPLES; k++) {
+				float t = (float)k / (float)NUM_SAMPLES;
+				math::Vec pt = evalQuadBezier(outPos, slump, inPos, t);
+				cp.sampledPoints.push_back(pt);
+				cp.sampleSegmentIndices.push_back(0);
+			}
+
+			cachedUntiedPaths.push_back(cp);
 		}
-
-		cachedUntiedPaths.push_back(cp);
 	}
 }
 
@@ -477,6 +500,13 @@ void HarnessOverlayWidget::onButton(const ButtonEvent& e) {
 			cutStartPos = e.pos;
 			cutCurrentPos = e.pos;
 			intersectedCables.clear();
+			if (APP && APP->scene && APP->scene->rack) {
+				std::unordered_map<int64_t, app::CableWidget*> activeCables;
+				for (app::CableWidget* cw : APP->scene->rack->getCompleteCables()) {
+					if (cw && cw->cable) activeCables[cw->cable->id] = cw;
+				}
+				updateCablePaths(activeCables);
+			}
 			e.consume(this);
 			return;
 		}
