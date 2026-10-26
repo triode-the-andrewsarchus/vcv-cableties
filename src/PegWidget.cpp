@@ -289,26 +289,66 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 
 		float cx = box.size.x * 0.5f;
 
-		// 1. Top NIM-BIN Header ("PEGS")
-		nvgFontSize(vg, 8.2f);
-		nvgTextLetterSpacing(vg, 0.8f);
-		nvgFillColor(vg, dark ? nvgRGB(236, 240, 246) : nvgRGB(26, 30, 34));
-		nvgText(vg, cx + 0.3f, 24.0f, "PEGS", NULL);
+		// 0. Dynamic NIM-BIN Outer Technical Frame
+		// When linked above or below, open the frame across the shared seam so the two modules visually merge!
+		float frameTop = linkedAbove ? 0.0f : 16.5f;
+		float frameBot = linkedBelow ? box.size.y : 363.5f;
+		NVGcolor frameCol = dark ? nvgRGB(80, 86, 94) : nvgRGB(43, 48, 53);
 
-		// Terracotta Badge ("KEEP")
 		nvgBeginPath(vg);
-		nvgRoundedRect(vg, 4.0f, 30.8f, 22.0f, 8.6f, 1.4f);
-		nvgFillColor(vg, dark ? nvgRGB(200, 68, 36) : nvgRGB(184, 58, 27));
-		nvgFill(vg);
+		if (!linkedAbove && !linkedBelow) {
+			nvgRoundedRect(vg, 2.5f, frameTop, 25.0f, frameBot - frameTop, 1.2f);
+		}
+		else {
+			// Side rails of the technical frame
+			nvgMoveTo(vg, 2.5f, frameTop);
+			nvgLineTo(vg, 2.5f, frameBot);
+			nvgMoveTo(vg, 27.5f, frameTop);
+			nvgLineTo(vg, 27.5f, frameBot);
+			if (!linkedAbove) {
+				nvgMoveTo(vg, 2.5f, frameTop);
+				nvgLineTo(vg, 27.5f, frameTop);
+			}
+			if (!linkedBelow) {
+				nvgMoveTo(vg, 2.5f, frameBot);
+				nvgLineTo(vg, 27.5f, frameBot);
+			}
+		}
+		nvgStrokeColor(vg, frameCol);
+		nvgStrokeWidth(vg, 1.0f);
+		nvgStroke(vg);
 
-		nvgFontSize(vg, 5.5f);
-		nvgTextLetterSpacing(vg, 0.4f);
-		nvgFillColor(vg, nvgRGB(246, 245, 240));
-		nvgText(vg, cx + 0.2f, 35.2f, "GUARD", NULL);
+		// 1. Top NIM-BIN Header ("PEGS" + "GUARD") — ONLY drawn when NOT linked above!
+		if (!linkedAbove) {
+			// Top accent rule under header
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, 2.5f, 42.0f);
+			nvgLineTo(vg, 27.5f, 42.0f);
+			nvgStrokeColor(vg, dark ? nvgRGB(224, 83, 46) : nvgRGB(184, 58, 27));
+			nvgStrokeWidth(vg, 1.5f);
+			nvgStroke(vg);
+
+			nvgFontSize(vg, 8.2f);
+			nvgTextLetterSpacing(vg, 0.8f);
+			nvgFillColor(vg, dark ? nvgRGB(236, 240, 246) : nvgRGB(26, 30, 34));
+			nvgText(vg, cx + 0.3f, 24.0f, "PEGS", NULL);
+
+			// Terracotta Badge ("GUARD")
+			nvgBeginPath(vg);
+			nvgRoundedRect(vg, 4.0f, 30.8f, 22.0f, 8.6f, 1.4f);
+			nvgFillColor(vg, dark ? nvgRGB(200, 68, 36) : nvgRGB(184, 58, 27));
+			nvgFill(vg);
+
+			nvgFontSize(vg, 5.5f);
+			nvgTextLetterSpacing(vg, 0.4f);
+			nvgFillColor(vg, nvgRGB(246, 245, 240));
+			nvgText(vg, cx + 0.2f, 35.2f, "GUARD", NULL);
+		}
 
 		// 2. Vertical Keep-Out Channel Strip between active pegs
-		float trackTop = linkedAbove ? 0.0f : PegModule::TOP_PEG_Y;
-		float trackBot = linkedBelow ? box.size.y : PegModule::BOT_PEG_Y;
+		// Stops cleanly at the mounting screw collar (y=16 / y=364) so it never runs through the screws
+		float trackTop = linkedAbove ? 16.5f : PegModule::TOP_PEG_Y;
+		float trackBot = linkedBelow ? (box.size.y - 16.5f) : PegModule::BOT_PEG_Y;
 
 		// Recessed machined guide slot
 		nvgBeginPath(vg);
@@ -321,15 +361,17 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 
 		// Terracotta keep-out center tension line
 		nvgBeginPath(vg);
-		nvgMoveTo(vg, cx, trackTop);
-		nvgLineTo(vg, cx, trackBot);
+		nvgMoveTo(vg, cx, trackTop + 1.0f);
+		nvgLineTo(vg, cx, trackBot - 1.0f);
 		nvgStrokeColor(vg, dark ? nvgRGBA(224, 86, 52, 210) : nvgRGBA(184, 58, 27, 200));
 		nvgStrokeWidth(vg, 1.6f);
 		nvgStroke(vg);
 
 		// Graduated tick marks along vertical keep-out channel
+		float tickStart = linkedAbove ? 46.0f : 78.0f;
+		float tickEnd   = linkedBelow ? 334.0f : 302.0f;
 		nvgBeginPath(vg);
-		for (float y = 78.0f; y <= 302.0f; y += 16.0f) {
+		for (float y = tickStart; y <= tickEnd; y += 16.0f) {
 			nvgMoveTo(vg, cx - 5.5f, y);
 			nvgLineTo(vg, cx - 3.2f, y);
 			nvgMoveTo(vg, cx + 3.2f, y);
@@ -362,26 +404,29 @@ struct PegPanelGraphicsWidget : widget::TransparentWidget {
 			nvgText(vg, cx, midY + 5.0f, hLabel.c_str(), NULL);
 		}
 
-		// 4. Draw Top & Bottom Turret Pegs (or flush sockets when vertically linked!)
+		// 4. Draw Top & Bottom Turret Pegs ONLY when active (removed cleanly when vertically linked!)
 		if (!linkedAbove) {
 			drawTurretPeg(vg, PegModule::PEG_X, PegModule::TOP_PEG_Y, dark);
-		}
-		else {
-			drawFlushSocket(vg, PegModule::PEG_X, PegModule::TOP_PEG_Y, dark);
 		}
 
 		if (!linkedBelow) {
 			drawTurretPeg(vg, PegModule::PEG_X, PegModule::BOT_PEG_Y, dark);
 		}
-		else {
-			drawFlushSocket(vg, PegModule::PEG_X, PegModule::BOT_PEG_Y, dark);
-		}
 
-		// 5. Bottom NIM-BIN Footer ("2HP")
-		nvgFontSize(vg, 5.8f);
-		nvgTextLetterSpacing(vg, 0.8f);
-		nvgFillColor(vg, dark ? nvgRGB(145, 153, 164) : nvgRGB(42, 46, 50));
-		nvgText(vg, cx + 0.3f, 358.0f, "NIM · 2HP", NULL);
+		// 5. Bottom NIM-BIN Footer ("NIM · 2HP") — ONLY drawn when NOT linked below!
+		if (!linkedBelow) {
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, 2.5f, 352.0f);
+			nvgLineTo(vg, 27.5f, 352.0f);
+			nvgStrokeColor(vg, dark ? nvgRGB(61, 67, 74) : nvgRGB(43, 48, 53));
+			nvgStrokeWidth(vg, 0.8f);
+			nvgStroke(vg);
+
+			nvgFontSize(vg, 5.8f);
+			nvgTextLetterSpacing(vg, 0.8f);
+			nvgFillColor(vg, dark ? nvgRGB(145, 153, 164) : nvgRGB(42, 46, 50));
+			nvgText(vg, cx + 0.3f, 358.0f, "NIM · 2HP", NULL);
+		}
 
 		nvgRestore(vg);
 	}
@@ -412,8 +457,8 @@ PegWidget::PegWidget(PegModule* module) {
 	VerticalLinkButton* topBtn = new VerticalLinkButton;
 	topBtn->owner = this;
 	topBtn->isTopEdge = true;
-	topBtn->box.pos = math::Vec(3.5f, 43.0f);
-	topBtn->box.size = math::Vec(23.0f, 11.0f);
+	topBtn->box.pos = math::Vec(3.5f, 22.0f);
+	topBtn->box.size = math::Vec(23.0f, 11.5f);
 	topBtn->visible = false;
 	addChild(topBtn);
 	topLinkBtn = topBtn;
@@ -422,8 +467,8 @@ PegWidget::PegWidget(PegModule* module) {
 	VerticalLinkButton* botBtn = new VerticalLinkButton;
 	botBtn->owner = this;
 	botBtn->isTopEdge = false;
-	botBtn->box.pos = math::Vec(3.5f, 336.0f);
-	botBtn->box.size = math::Vec(23.0f, 11.0f);
+	botBtn->box.pos = math::Vec(3.5f, 346.5f);
+	botBtn->box.size = math::Vec(23.0f, 11.5f);
 	botBtn->visible = false;
 	addChild(botBtn);
 	botLinkBtn = botBtn;
@@ -532,9 +577,16 @@ void PegWidget::step() {
 			}
 		}
 
-		// Show vertical link buttons whenever aligned with a vertical neighbor
-		if (topLinkBtn) topLinkBtn->visible = (aboveNeighbor != nullptr);
-		if (botLinkBtn) botLinkBtn->visible = (belowNeighbor != nullptr);
+		// Show vertical link buttons whenever aligned with a vertical neighbor,
+		// and automatically reposition them so they never collide with the PEGS header or 2HP footer when unlinked!
+		if (topLinkBtn) {
+			topLinkBtn->visible = (aboveNeighbor != nullptr);
+			topLinkBtn->box.pos.y = (m->linkedAboveId != -1) ? 24.0f : 43.2f;
+		}
+		if (botLinkBtn) {
+			botLinkBtn->visible = (belowNeighbor != nullptr);
+			botLinkBtn->box.pos.y = (m->linkedBelowId != -1) ? 344.5f : 335.5f;
+		}
 
 		// 2. Validate horizontal same-row links (linkedLeftId & linkedRightId)
 		if (m->linkedLeftId != -1) {

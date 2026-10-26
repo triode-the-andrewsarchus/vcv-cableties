@@ -27,13 +27,4 @@
   <line x1="29.5" y1="0" x2="29.5" y2="380" stroke="#141618" stroke-width="1" />
   <line x1="0" y1="0.5" x2="30" y2="0.5" stroke="#444950" stroke-width="1" />
   <line x1="0" y1="379.5" x2="30" y2="379.5" stroke="#141618" stroke-width="1" />
-
-  <!-- NIM-BIN Outer Technical Frame -->
-  <rect x="2.5" y="16.5" width="25" height="347" rx="1.2" fill="none" stroke="#50565e" stroke-width="1.0" />
-
-  <!-- Top Accent Rule under Header -->
-  <line x1="2.5" y1="42.0" x2="27.5" y2="42.0" stroke="#e0532e" stroke-width="1.5" />
-
-  <!-- Bottom Accent Rule above Footer -->
-  <line x1="2.5" y1="352.0" x2="27.5" y2="352.0" stroke="#3d434a" stroke-width="0.8" />
 </svg>
