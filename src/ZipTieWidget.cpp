@@ -16,16 +16,18 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 		NVGcontext* vg = args.vg;
 		if (!APP || !APP->window || !APP->window->uiFont) return;
 
+		bool dark = settings::preferDarkPanels;
+
 		nvgSave(vg);
 		nvgFontFaceId(vg, APP->window->uiFont->handle);
 		nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
 		float cx = box.size.x * 0.5f;
 
-		// 1. Top NIM-BIN Header (on brushed aluminum, no empty black box)
+		// 1. Top NIM-BIN Header
 		nvgFontSize(vg, 12.5f);
 		nvgTextLetterSpacing(vg, 1.5f);
-		nvgFillColor(vg, nvgRGB(26, 30, 34));
+		nvgFillColor(vg, dark ? nvgRGB(236, 240, 246) : nvgRGB(26, 30, 34));
 		nvgText(vg, cx + 0.5f, 25.0f, "ZIP-TIE", NULL);
 
 		// Terracotta subtitle badge ("Wire Harness")
@@ -38,7 +40,7 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 
 		nvgBeginPath(vg);
 		nvgRoundedRect(vg, cx - badgeW * 0.5f, 32.2f, badgeW, 9.2f, 1.5f);
-		nvgFillColor(vg, nvgRGB(184, 58, 27));
+		nvgFillColor(vg, dark ? nvgRGB(200, 68, 36) : nvgRGB(184, 58, 27));
 		nvgFill(vg);
 
 		nvgFillColor(vg, nvgRGB(246, 245, 240));
@@ -47,38 +49,38 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 		// 2. Section 1 Header: Shortcut Tape
 		nvgFontSize(vg, 6.8f);
 		nvgTextLetterSpacing(vg, 1.0f);
-		nvgFillColor(vg, nvgRGB(38, 42, 46));
+		nvgFillColor(vg, dark ? nvgRGB(180, 186, 195) : nvgRGB(38, 42, 46));
 		nvgText(vg, cx + 0.4f, 51.5f, "KEY SHORTCUT", NULL);
 
 		// 3. Section 2 Header: Rectangular Tie Applicator
 		nvgFontSize(vg, 7.2f);
 		nvgTextLetterSpacing(vg, 0.9f);
-		nvgFillColor(vg, nvgRGB(28, 32, 36));
+		nvgFillColor(vg, dark ? nvgRGB(210, 216, 225) : nvgRGB(28, 32, 36));
 		nvgText(vg, cx + 0.4f, 106.5f, "TIE APPLICATOR", NULL);
 
 		nvgFontSize(vg, 6.0f);
 		nvgTextLetterSpacing(vg, 0.8f);
-		nvgFillColor(vg, nvgRGB(184, 58, 27));
+		nvgFillColor(vg, dark ? nvgRGB(224, 86, 52) : nvgRGB(184, 58, 27));
 		nvgText(vg, cx + 0.4f, 115.0f, "MANUAL ARM", NULL);
 
 		// 4. Section 3 Header: Harness Pitch & Scale Labels
 		nvgFontSize(vg, 7.2f);
 		nvgTextLetterSpacing(vg, 0.9f);
-		nvgFillColor(vg, nvgRGB(28, 32, 36));
+		nvgFillColor(vg, dark ? nvgRGB(210, 216, 225) : nvgRGB(28, 32, 36));
 		nvgText(vg, cx + 0.4f, 168.5f, "HARNESS PITCH", NULL);
 
 		// MIN / MAX calibration labels around knob
 		nvgFontSize(vg, 6.5f);
 		nvgTextLetterSpacing(vg, 0.4f);
-		nvgFillColor(vg, nvgRGB(38, 42, 46));
+		nvgFillColor(vg, dark ? nvgRGB(175, 182, 192) : nvgRGB(38, 42, 46));
 		nvgText(vg, 20.0f, 272.5f, "MIN", NULL);
-		nvgFillColor(vg, nvgRGB(184, 58, 27));
+		nvgFillColor(vg, dark ? nvgRGB(224, 86, 52) : nvgRGB(184, 58, 27));
 		nvgText(vg, 70.0f, 272.5f, "MAX", NULL);
 
 		// 5. Section 4 Header: Danger Jettison All & Diagonal Hazard Stripes
 		nvgFontSize(vg, 7.2f);
 		nvgTextLetterSpacing(vg, 0.9f);
-		nvgFillColor(vg, nvgRGB(180, 28, 20));
+		nvgFillColor(vg, dark ? nvgRGB(235, 60, 48) : nvgRGB(180, 28, 20));
 		nvgText(vg, cx + 0.4f, 288.5f, "JETTISON ALL", NULL);
 
 		// Diagonal Yellow/Black Hazard Stripes Frame around Molly-Guard (x=16, y=295, w=58, h=46)
@@ -109,20 +111,20 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 		// Outer border around hazard box
 		nvgBeginPath(vg);
 		nvgRoundedRect(vg, hx, hy, hw, hh, 2.5f);
-		nvgStrokeColor(vg, nvgRGB(26, 29, 32));
+		nvgStrokeColor(vg, dark ? nvgRGB(40, 44, 49) : nvgRGB(26, 29, 32));
 		nvgStrokeWidth(vg, 1.0f);
 		nvgStroke(vg);
 
 		// Subtitle below Molly-Guard
 		nvgFontSize(vg, 5.8f);
 		nvgTextLetterSpacing(vg, 0.5f);
-		nvgFillColor(vg, nvgRGB(48, 52, 56));
+		nvgFillColor(vg, dark ? nvgRGB(160, 168, 178) : nvgRGB(48, 52, 56));
 		nvgText(vg, cx + 0.3f, 346.8f, "LIFT GUARD · 2X CLICK", NULL);
 
-		// 6. Bottom NIM-BIN Footer (silkscreened on aluminum, no black bar)
+		// 6. Bottom NIM-BIN Footer
 		nvgFontSize(vg, 6.2f);
 		nvgTextLetterSpacing(vg, 1.2f);
-		nvgFillColor(vg, nvgRGB(42, 46, 50));
+		nvgFillColor(vg, dark ? nvgRGB(145, 153, 164) : nvgRGB(42, 46, 50));
 		nvgText(vg, cx + 0.5f, 358.0f, "NIM-BIN · STD", NULL);
 
 		nvgRestore(vg);
@@ -647,7 +649,7 @@ struct WirePreviewWidget : widget::TransparentWidget {
 			// Brushed aluminum panel lip overlapping outer wire tips
 			nvgBeginPath(vg);
 			nvgRoundedRect(vg, hoodX, hoodY, hoodW, hoodH, 1.5f);
-			nvgFillColor(vg, nvgRGB(208, 211, 205));
+			nvgFillColor(vg, settings::preferDarkPanels ? nvgRGB(40, 44, 49) : nvgRGB(208, 211, 205));
 			nvgFill(vg);
 
 			// Crisp inner bevel edge where wires emerge
@@ -655,7 +657,7 @@ struct WirePreviewWidget : widget::TransparentWidget {
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, bevelX, hoodY + 0.5f);
 			nvgLineTo(vg, bevelX, hoodY + hoodH - 0.5f);
-			nvgStrokeColor(vg, nvgRGB(42, 46, 50));
+			nvgStrokeColor(vg, settings::preferDarkPanels ? nvgRGB(80, 88, 98) : nvgRGB(42, 46, 50));
 			nvgStrokeWidth(vg, 1.1f);
 			nvgStroke(vg);
 		};
@@ -1101,7 +1103,10 @@ struct ZipTieWidget : app::ModuleWidget {
 
 	ZipTieWidget(ZipTieModule* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/ZipTie.svg")));
+		setPanel(createPanel(
+			asset::plugin(pluginInstance, "res/ZipTie.svg"),
+			asset::plugin(pluginInstance, "res/ZipTie_dark.svg")
+		));
 
 		// 0. NIM-BIN Panel Typography & Hazard Stripes Overlay
 		NimPanelGraphicsWidget* panelGraphics = new NimPanelGraphicsWidget;
@@ -1109,11 +1114,11 @@ struct ZipTieWidget : app::ModuleWidget {
 		panelGraphics->box.size = box.size;
 		addChild(panelGraphics);
 
-		// Screws (industrial silver screws matching NIM-BIN faceplate)
-		addChild(createWidget<ScrewSilver>(math::Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewSilver>(math::Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewSilver>(math::Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewSilver>(math::Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		// Screws (silver on light panel, black on dark panel)
+		addChild(createWidget<ThemedScrew>(math::Vec(RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ThemedScrew>(math::Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ThemedScrew>(math::Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ThemedScrew>(math::Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		// 1. Fake Piece of Scotch Tape with Sharpie Shortcut Display
 		ScotchTapeWidget* tapeWidget = new ScotchTapeWidget;

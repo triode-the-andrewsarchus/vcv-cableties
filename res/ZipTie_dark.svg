@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="90" height="380" viewBox="0 0 90 380">
+  <defs>
+    <!-- Dark Anodized Brushed Aluminum NIM-BIN Base -->
+    <linearGradient id="nimDarkAluminum" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#24272b" />
+      <stop offset="15%" stop-color="#2d3136" />
+      <stop offset="50%" stop-color="#282b30" />
+      <stop offset="85%" stop-color="#2d3136" />
+      <stop offset="100%" stop-color="#202327" />
+    </linearGradient>
+
+    <!-- Subtle Vertical Brushed Sheen -->
+    <linearGradient id="nimDarkSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08" />
+      <stop offset="50%" stop-color="#000000" stop-opacity="0.0" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.18" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main Dark Brushed Faceplate -->
+  <rect width="90" height="380" fill="url(#nimDarkAluminum)" />
+  <rect width="90" height="380" fill="url(#nimDarkSheen)" />
+
+  <!-- Machined Edge Chamfers -->
+  <line x1="0.5" y1="0" x2="0.5" y2="380" stroke="#444950" stroke-width="1" />
+  <line x1="89.5" y1="0" x2="89.5" y2="380" stroke="#141618" stroke-width="1" />
+  <line x1="0" y1="0.5" x2="90" y2="0.5" stroke="#444950" stroke-width="1" />
+  <line x1="0" y1="379.5" x2="90" y2="379.5" stroke="#141618" stroke-width="1" />
+
+  <!-- NIM-BIN Outer Technical Frame -->
+  <rect x="4.5" y="16.5" width="81" height="347" rx="1.5" fill="none" stroke="#50565e" stroke-width="1.0" />
+
+  <!-- Top Accent Rule under NIM Header -->
+  <line x1="4.5" y1="44.0" x2="85.5" y2="44.0" stroke="#e0532e" stroke-width="1.6" />
+
+  <!-- Alignment Corner Ticks for Scotch Tape Label Area -->
+  <path d="M 11 61 L 11 58 L 14 58" fill="none" stroke="#68707a" stroke-width="0.8" />
+  <path d="M 79 61 L 79 58 L 76 58" fill="none" stroke="#68707a" stroke-width="0.8" />
+  <path d="M 11 89 L 11 92 L 14 92" fill="none" stroke="#68707a" stroke-width="0.8" />
+  <path d="M 79 89 L 79 92 L 76 92" fill="none" stroke="#68707a" stroke-width="0.8" />
+
+  <!-- Section Divider 1 -->
+  <line x1="8" y1="98" x2="82" y2="98" stroke="#3d434a" stroke-width="0.8" />
+
+  <!-- Section Divider 2 -->
+  <line x1="8" y1="160" x2="82" y2="160" stroke="#3d434a" stroke-width="0.8" />
+
+  <!-- Calibration Scale Marks around Spacing Knob at (45, 250) -->
+  <g stroke="#9aa2ad" stroke-width="1.1">
+    <!-- Center top tick -->
+    <line x1="45" y1="225" x2="45" y2="229" />
+    <!-- Left ticks -->
+    <line x1="27.3" y1="232.3" x2="30.1" y2="235.1" />
+    <line x1="20.0" y1="250.0" x2="24.0" y2="250.0" />
+    <line x1="25.5" y1="266.0" x2="28.8" y2="263.3" stroke-width="1.4" />
+    <!-- Right ticks -->
+    <line x1="62.7" y1="232.3" x2="59.9" y2="235.1" />
+    <line x1="70.0" y1="250.0" x2="66.0" y2="250.0" />
+    <line x1="64.5" y1="266.0" x2="61.2" y2="263.3" stroke-width="1.4" />
+  </g>
+
+  <!-- Section Divider 3 -->
+  <line x1="8" y1="280" x2="82" y2="280" stroke="#3d434a" stroke-width="0.8" />
+
+  <!-- Bottom Accent Rule above NIM Footer -->
+  <line x1="4.5" y1="352.0" x2="85.5" y2="352.0" stroke="#3d434a" stroke-width="0.8" />
+</svg>
