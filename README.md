@@ -2,7 +2,7 @@
 
 A VCV Rack v2 utility module that modifies cable behavior, enabling users to bundle patch cables together using interactive **Zip Ties**, mimicking real-world wiring harnesses and cable looms.
 
-![Zip Ties Preview](res/ZipTie.svg)
+![Zip Ties Preview](res/preview.png)
 
 ## Features
 
