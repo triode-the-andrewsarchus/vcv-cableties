@@ -103,13 +103,18 @@ inline void setPlugRotation(app::PlugWidget* plug, float angle) {
 	}
 }
 
+inline math::Vec getSlumpPos(math::Vec outPos, math::Vec inPos) {
+	float dist = outPos.minus(inPos).norm();
+	math::Vec slump = outPos.plus(inPos).div(2.f);
+	slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
+	return slump;
+}
+
 inline void restoreCablePlugs(app::CableWidget* cw) {
 	if (!cw || !cw->isComplete()) return;
 	math::Vec outPos = cw->getOutputPos();
 	math::Vec inPos = cw->getInputPos();
-	float dist = outPos.minus(inPos).norm();
-	math::Vec slump = outPos.plus(inPos).div(2.f);
-	slump.y += (1.0f - settings::cableTension) * (150.0f + 1.0f * dist);
+	math::Vec slump = getSlumpPos(outPos, inPos);
 	setPlugRotation(cw->outputPlug, slump.minus(outPos).arg());
 	setPlugRotation(cw->inputPlug, slump.minus(inPos).arg());
 }

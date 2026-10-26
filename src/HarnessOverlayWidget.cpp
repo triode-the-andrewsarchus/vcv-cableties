@@ -14,7 +14,9 @@ struct Waypoint {
 	rack::math::Vec pos;
 	rack::math::Vec tangent;
 	bool isPort = false;
-	Waypoint(rack::math::Vec p, rack::math::Vec t, bool port = false) : pos(p), tangent(t), isPort(port) {}
+	bool isPeg = false;
+	Waypoint(rack::math::Vec p, rack::math::Vec t, bool port = false, bool peg = false)
+		: pos(p), tangent(t), isPort(port), isPeg(peg) {}
 };
 
 HarnessOverlayWidget* HarnessOverlayWidget::acquire(app::ModuleWidget* mw) {
@@ -421,8 +423,20 @@ static bool curveHitsObstacle(math::Vec p0, math::Vec p1, math::Vec p2, math::Ve
 	return false;
 }
 
-// Compute detour waypoints around a single KeepOutObstacle for segment A -> B
-static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, const KeepOutObstacle& obs, float extraMargin = 0.0f) {
+// Compute natural slack sag for a span of length `dist`:
+// Even if the user has VCV Rack's global cableTension slider at 1.0 (which only drops normal cables by 150 + 0.1*dist via getSlumpPos? No, in VCV Rack getSlumpPos is:
+// `pos.y += (1.0 - settings::cableTension) * (150.0 + 1.0 * dist)` in Rack v1, or in Rack v2? Wait: let's make sure Port<->Peg always has visible slack sag!)
+static float computeEndSlackSag(float dist) {
+	// Guarantee a natural slack droop on the outer sides of pegs even when cableTension is high
+	float tensionFactor = std::max(0.35f, 1.0f - settings::cableTension);
+	return tensionFactor * (45.0f + 0.28f * dist);
+}
+
+static float computeTiedSag(float dist) {
+	float tensionFactor = std::max(0.25f, 1.0f - settings::cableTension);
+	return tensionFactor * (16.0f + 0.10f * dist);
+}
+static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, bool useQuadSlump, const KeepOutObstacle& obs, float extraMargin = 0.0f) {
 	std::vector<math::Vec> result;
 
 	if (!obs.isBox) {
@@ -430,6 +444,14 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, co
 		float x = obs.pegLeftX;
 		math::Vec topW(x, obs.yTop - extraMargin);
 		math::Vec botW(x, obs.yBot + extraMargin);
+
+		// Check if the straight line A -> B itself crosses the barrier, or if ONLY gravity sag caused it to droop into the top peg!
+		bool straightCrosses = segmentHitsObstacle(A, B, obs, 0.0f);
+		if (!straightCrosses && useQuadSlump) {
+			// Cable drooped onto the top peg from above -> support it on topW!
+			result.push_back(topW);
+			return result;
+		}
 
 		float costTop = A.minus(topW).norm() + topW.minus(B).norm();
 		float costBot = A.minus(botW).norm() + botW.minus(B).norm();
@@ -445,12 +467,30 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, co
 		math::Vec(obs.xMin - extraMargin, obs.yBot + extraMargin)  // 3: BL
 	};
 
+	// Check if straight line A -> B clears the box, meaning only gravity sag drooped into the top of the box
+	bool straightCrosses = segmentHitsObstacle(A, B, obs, 1.5f);
+	if (!straightCrosses && useQuadSlump) {
+		bool leftToRight = (A.x <= B.x);
+		return leftToRight
+			? std::vector<math::Vec>{corners[0], corners[1]}
+			: std::vector<math::Vec>{corners[1], corners[0]};
+	}
+
 	float bestCost = 1e18f;
+
+	// Helper to test if a segment from a port/waypoint to a corner (with its moderate end-slack sag) hits the box
+	auto endSegmentWithSlackHitsBox = [&](math::Vec P, math::Vec Q) -> bool {
+		if (segmentHitsObstacle(P, Q, obs, 1.5f)) return true;
+		float d = P.minus(Q).norm();
+		float sag = computeEndSlackSag(d);
+		math::Vec slump = P.plus(Q).div(2.f).plus(math::Vec(0.f, sag));
+		return curveHitsObstacle(P, slump, slump, Q, true, obs, 2.0f);
+	};
 
 	// Test 1-corner detours
 	for (int c = 0; c < 4; ++c) {
 		math::Vec C = corners[c];
-		if (!segmentHitsObstacle(A, C, obs, 1.5f) && !segmentHitsObstacle(C, B, obs, 1.5f)) {
+		if (!endSegmentWithSlackHitsBox(A, C) && !endSegmentWithSlackHitsBox(C, B)) {
 			float cost = A.minus(C).norm() + C.minus(B).norm();
 			if (cost < bestCost) {
 				bestCost = cost;
@@ -459,7 +499,7 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, co
 		}
 	}
 
-	// Test 2-corner detours along perimeter edges (adjacent corners)
+	// Test 2-corner detours along perimeter edges (adjacent corners; C1->C2 is taut/straight!)
 	int adjPairs[8][2] = {
 		{0, 1}, {1, 0}, // Top edge (TL <-> TR)
 		{3, 2}, {2, 3}, // Bottom edge (BL <-> BR)
@@ -469,7 +509,7 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, co
 	for (int p = 0; p < 8; ++p) {
 		math::Vec C1 = corners[adjPairs[p][0]];
 		math::Vec C2 = corners[adjPairs[p][1]];
-		if (!segmentHitsObstacle(A, C1, obs, 1.5f) && !segmentHitsObstacle(C2, B, obs, 1.5f)) {
+		if (!endSegmentWithSlackHitsBox(A, C1) && !endSegmentWithSlackHitsBox(C2, B)) {
 			float cost = A.minus(C1).norm() + C1.minus(C2).norm() + C2.minus(B).norm();
 			if (cost < bestCost) {
 				bestCost = cost;
@@ -535,6 +575,7 @@ static std::vector<math::Vec> routeSegmentAroundObstacles(
 			for (const KeepOutObstacle* obs : validObstacles) {
 				if (handledObstacles.count(obs)) continue;
 				bool hit = false;
+				bool isEndpointSpan = (s == 0 || s + 2 == pts.size());
 				if (!anyInserted && useQuadSlump) {
 					float dist = A.minus(B).norm();
 					math::Vec slump = A.plus(B).div(2.f);
@@ -543,13 +584,30 @@ static std::vector<math::Vec> routeSegmentAroundObstacles(
 				}
 				else if (!anyInserted) {
 					float dist = A.minus(B).norm();
-					float sag = (1.0f - settings::cableTension) * (16.0f + 0.10f * dist);
+					float sag = computeTiedSag(dist);
 					math::Vec dir = B.minus(A).normalize();
 					math::Vec p1 = A.plus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
 					math::Vec p2 = B.minus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
 					hit = curveHitsObstacle(A, p1, p2, B, false, *obs, 0.0f);
 				}
+				else if (isEndpointSpan && useQuadSlump) {
+					// After deflecting around one peg, the Port<->Peg end segment still has slack sag!
+					// Test both straight line AND its slack sag curve so a second peg module catches it too!
+					float dist = A.minus(B).norm();
+					math::Vec slump = A.plus(B).div(2.f);
+					slump.y += computeEndSlackSag(dist);
+					hit = segmentHitsObstacle(A, B, *obs, 0.0f) || curveHitsObstacle(A, slump, slump, B, true, *obs, 0.0f);
+				}
+				else if (isEndpointSpan) {
+					float dist = A.minus(B).norm();
+					float sag = computeTiedSag(dist);
+					math::Vec dir = B.minus(A).normalize();
+					math::Vec p1 = A.plus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
+					math::Vec p2 = B.minus(dir.mult(dist * 0.35f)).plus(math::Vec(0.f, sag));
+					hit = segmentHitsObstacle(A, B, *obs, 0.0f) || curveHitsObstacle(A, p1, p2, B, false, *obs, 0.0f);
+				}
 				else {
+					// Interior Peg<->Peg span is taut (straight line)
 					hit = segmentHitsObstacle(A, B, *obs, 0.0f);
 				}
 
@@ -565,7 +623,7 @@ static std::vector<math::Vec> routeSegmentAroundObstacles(
 
 			if (hitObs) {
 				handledObstacles.insert(hitObs);
-				std::vector<math::Vec> detour = computeObstacleDetour(A, B, *hitObs);
+				std::vector<math::Vec> detour = computeObstacleDetour(A, B, useQuadSlump, *hitObs);
 				if (!detour.empty()) {
 					pts.insert(pts.begin() + (s + 1), detour.begin(), detour.end());
 					anyInserted = true;
@@ -660,65 +718,101 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 	};
 
 	// Helper to build smooth cubic Bezier segments from a list of Waypoints and align jack plugs
-	auto buildCubicSegmentsFromWaypoints = [&](CablePath& cp, app::CableWidget* cw, std::vector<Waypoint>& waypoints, bool sampleAlways) {
+	auto buildCubicSegmentsFromWaypoints = [&](CablePath& cp, app::CableWidget* cw, std::vector<Waypoint>& waypoints, bool sampleAlways, bool isUntiedCable = false) {
 		for (size_t s = 0; s < waypoints.size() - 1; s++) {
 			Waypoint& w0 = waypoints[s];
 			Waypoint& w1 = waypoints[s + 1];
 
 			math::Vec rawP0 = w0.pos;
 			math::Vec rawP3 = w1.pos;
-
 			float dist = rawP3.minus(rawP0).norm();
-			math::Vec t0 = w0.tangent;
-			math::Vec t1 = w1.tangent;
-
-			if (w0.isPort) {
-				t0 = rawP3.minus(rawP0).normalize().plus(math::Vec(0.f, 0.7f)).normalize();
-			}
-			else {
-				if (t0.dot(rawP3.minus(rawP0)) < 0.f) t0 = t0.neg();
-			}
-
-			if (w1.isPort) {
-				t1 = rawP3.minus(rawP0).normalize().plus(math::Vec(0.f, -0.7f)).normalize();
-			}
-			else {
-				if (t1.dot(rawP3.minus(rawP0)) < 0.f) t1 = t1.neg();
-			}
-
-			math::Vec p1 = rawP0.plus(t0.mult(dist * 0.36f));
-			math::Vec p2 = rawP3.minus(t1.mult(dist * 0.36f));
-
-			// Tension / sag droop
-			float sag = (1.0f - settings::cableTension) * (16.0f + 0.10f * dist);
-			p1.y += sag;
-			p2.y += sag;
 
 			math::Vec p0 = rawP0;
+			math::Vec p1, p2;
 			math::Vec p3 = rawP3;
 
-			// Align output plug direction & start wire at exact tip of plug (14px from port center)
-			if (w0.isPort) {
-				math::Vec outVec = p1.minus(rawP0);
-				float outLen = outVec.norm();
-				math::Vec outDir = (outLen > 1e-3f) ? outVec.div(outLen) : math::Vec(0.f, 1.f);
-				if (outLen < 18.0f) {
-					p1 = rawP0.plus(outDir.mult(18.0f));
-				}
-				p0 = rawP0.plus(outDir.mult(14.0f));
-				setPlugRotation(cw->outputPlug, outDir.arg());
+			// CASE 1: Segment between two Pegs -> pulled 100% taut (perfectly straight line, zero sag!)
+			if (w0.isPeg && w1.isPeg) {
+				p1 = rawP0.plus(rawP3.minus(rawP0).mult(1.0f / 3.0f));
+				p2 = rawP0.plus(rawP3.minus(rawP0).mult(2.0f / 3.0f));
 			}
+			// CASE 2: Untied cable going from Port to Peg (or Peg to Port) -> gentle slack sag with a hard point at the peg!
+			else if (isUntiedCable && (w0.isPort || w1.isPort)) {
+				math::Vec slump = rawP0.plus(rawP3).div(2.f);
+				// Always give visible slack sag on the outer sides of pegs (even if settings::cableTension == 1.0)
+				slump.y += computeEndSlackSag(dist);
 
-			// Align input plug direction & end wire at exact tip of plug (14px from port center)
-			if (w1.isPort) {
-				math::Vec inVec = p2.minus(rawP3);
-				float inLen = inVec.norm();
-				math::Vec inDir = (inLen > 1e-3f) ? inVec.div(inLen) : math::Vec(0.f, 1.f);
-				if (inLen < 18.0f) {
-					p2 = rawP3.plus(inDir.mult(18.0f));
+				if (w0.isPort) {
+					math::Vec outDir = slump.minus(rawP0).normalize();
+					p0 = rawP0.plus(outDir.mult(14.0f));
+					setPlugRotation(cw->outputPlug, outDir.arg());
 				}
-				p3 = rawP3.plus(inDir.mult(14.0f));
-				setPlugRotation(cw->inputPlug, inDir.arg());
+				if (w1.isPort) {
+					math::Vec inDir = slump.minus(rawP3).normalize();
+					p3 = rawP3.plus(inDir.mult(14.0f));
+					setPlugRotation(cw->inputPlug, inDir.arg());
+				}
+
+				// Exact degree elevation of quadratic Bezier (p0, slump, p3) to cubic Bezier (p0, p1, p2, p3)
+				p1 = p0.plus(slump.minus(p0).mult(2.0f / 3.0f));
+				p2 = p3.plus(slump.minus(p3).mult(2.0f / 3.0f));
+			}
+			// CASE 3: Zip-tied cable segments (Port <-> Tie, Tie <-> Tie, or Tie <-> Peg)
+			else {
+				math::Vec t0 = w0.tangent;
+				math::Vec t1 = w1.tangent;
+
+				if (w0.isPort) {
+					t0 = rawP3.minus(rawP0).normalize().plus(math::Vec(0.f, 0.7f)).normalize();
+				}
+				else if (w0.isPeg) {
+					t0 = rawP3.minus(rawP0).normalize();
+				}
+				else {
+					if (t0.dot(rawP3.minus(rawP0)) < 0.f) t0 = t0.neg();
+				}
+
+				if (w1.isPort) {
+					t1 = rawP3.minus(rawP0).normalize().plus(math::Vec(0.f, -0.7f)).normalize();
+				}
+				else if (w1.isPeg) {
+					t1 = rawP3.minus(rawP0).normalize();
+				}
+				else {
+					if (t1.dot(rawP3.minus(rawP0)) < 0.f) t1 = t1.neg();
+				}
+
+				p1 = rawP0.plus(t0.mult(dist * 0.36f));
+				p2 = rawP3.minus(t1.mult(dist * 0.36f));
+
+				// Tension / sag droop
+				float sag = computeTiedSag(dist);
+				p1.y += sag;
+				p2.y += sag;
+
+				// Align output plug direction & start wire at exact tip of plug (14px from port center)
+				if (w0.isPort) {
+					math::Vec outVec = p1.minus(rawP0);
+					float outLen = outVec.norm();
+					math::Vec outDir = (outLen > 1e-3f) ? outVec.div(outLen) : math::Vec(0.f, 1.f);
+					if (outLen < 18.0f) {
+						p1 = rawP0.plus(outDir.mult(18.0f));
+					}
+					p0 = rawP0.plus(outDir.mult(14.0f));
+					setPlugRotation(cw->outputPlug, outDir.arg());
+				}
+
+				// Align input plug direction & end wire at exact tip of plug (14px from port center)
+				if (w1.isPort) {
+					math::Vec inVec = p2.minus(rawP3);
+					float inLen = inVec.norm();
+					math::Vec inDir = (inLen > 1e-3f) ? inVec.div(inLen) : math::Vec(0.f, 1.f);
+					if (inLen < 18.0f) {
+						p2 = rawP3.plus(inDir.mult(18.0f));
+					}
+					p3 = rawP3.plus(inDir.mult(14.0f));
+					setPlugRotation(cw->inputPlug, inDir.arg());
+				}
 			}
 
 			CableSegmentCurve curve;
@@ -930,13 +1024,13 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 							math::Vec pegNorm(-pegTan.y, pegTan.x);
 
 							math::Vec deflectedWirePos = detours[d].plus(pegNorm.mult(avgOffset));
-							finalWaypoints.push_back(Waypoint(deflectedWirePos, pegTan, false));
+							finalWaypoints.push_back(Waypoint(deflectedWirePos, pegTan, false, true));
 						}
 					}
 				}
 			}
 
-			buildCubicSegmentsFromWaypoints(cp, cw, finalWaypoints, false);
+			buildCubicSegmentsFromWaypoints(cp, cw, finalWaypoints, false, false);
 			cachedTiedPaths.push_back(cp);
 		}
 	}
@@ -971,7 +1065,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 
 			std::vector<Waypoint> waypoints;
 			waypoints.reserve(detours.size() + 2);
-			waypoints.push_back(Waypoint(outPos, math::Vec(0.f, 1.f), true));
+			waypoints.push_back(Waypoint(outPos, math::Vec(0.f, 1.f), true, false));
 			for (size_t d = 0; d < detours.size(); ++d) {
 				math::Vec prevP = (d == 0) ? outPos : detours[d - 1];
 				math::Vec nextP = (d + 1 == detours.size()) ? inPos : detours[d + 1];
@@ -979,11 +1073,11 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 				math::Vec dirOut = nextP.minus(detours[d]).normalize();
 				math::Vec pegTan = dirIn.plus(dirOut).normalize();
 				if (pegTan.norm() < 1e-3f) pegTan = dirOut;
-				waypoints.push_back(Waypoint(detours[d], pegTan, false));
+				waypoints.push_back(Waypoint(detours[d], pegTan, false, true));
 			}
-			waypoints.push_back(Waypoint(inPos, math::Vec(0.f, -1.f), true));
+			waypoints.push_back(Waypoint(inPos, math::Vec(0.f, -1.f), true, false));
 
-			buildCubicSegmentsFromWaypoints(cp, cw, waypoints, false);
+			buildCubicSegmentsFromWaypoints(cp, cw, waypoints, false, true);
 			cachedTiedPaths.push_back(cp);
 		}
 		else {
