@@ -1,22 +1,22 @@
-#include "ZipTieModule.hpp"
+#include "CableTieModule.hpp"
 #include <app/RackWidget.hpp>
 #include <app/Scene.hpp>
 
-namespace ZipTies {
+namespace CableTies {
 
-ZipTieModule::ZipTieModule() {
+CableTieModule::CableTieModule() {
 	config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
 	configButton(PARAM_ARM_TOOL, "Arm Tie Tool (Draw lines to tie without holding shortcut)");
 	configParam(PARAM_WIRE_SPACING, 2.0f, 6.0f, 6.0f, "Bundle Wire Spacing", " px");
-	configSwitch(PARAM_TIE_STYLE, 0.f, 1.f, 0.f, "Zip Tie Color", {
+	configSwitch(PARAM_TIE_STYLE, 0.f, 1.f, 0.f, "Cable Tie Color", {
 		"Translucent (Default)",
 		"Black"
 	});
-	configButton(PARAM_SNIP_ALL, "Snip / Remove All Zip Ties");
+	configButton(PARAM_SNIP_ALL, "Snip / Remove All Cable Ties");
 }
 
-ZipTieModule::~ZipTieModule() {
+CableTieModule::~CableTieModule() {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 	if (APP && APP->scene && APP->scene->rack) {
 		for (auto& pair : cableTieSequences) {
@@ -29,17 +29,17 @@ ZipTieModule::~ZipTieModule() {
 	}
 }
 
-void ZipTieModule::onReset(const ResetEvent& e) {
+void CableTieModule::onReset(const ResetEvent& e) {
 	Module::onReset(e);
 	clearRequested.store(true, std::memory_order_relaxed);
 	toolArmed = false;
 	learningKey = false;
 	pendingMods = 0;
-	shortcutKey = GLFW_KEY_Z;
+	shortcutKey = GLFW_KEY_C;
 	shortcutMods = 0;
 }
 
-void ZipTieModule::process(const ProcessArgs& args) {
+void CableTieModule::process(const ProcessArgs& args) {
 	// Lock-free, allocation-free audio thread: signal UI thread if Snip All is triggered
 	if (snipTrigger.process(params[PARAM_SNIP_ALL].getValue() > 0.5f)) {
 		clearRequested.store(true, std::memory_order_relaxed);
@@ -54,10 +54,10 @@ void ZipTieModule::process(const ProcessArgs& args) {
 	lights[LIGHT_ARMED].setBrightness(toolArmed ? 1.0f : 0.0f);
 }
 
-int ZipTieModule::addZipTie(math::Vec pos, const std::vector<int64_t>& cableIds, const std::map<int64_t, int>& insertPositions) {
+int CableTieModule::addCableTie(math::Vec pos, const std::vector<int64_t>& cableIds, const std::map<int64_t, int>& insertPositions) {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 
-	ZipTie tie;
+	CableTie tie;
 	tie.id = nextTieId++;
 	tie.pos = pos;
 	tie.cableIds = cableIds;
@@ -72,7 +72,7 @@ int ZipTieModule::addZipTie(math::Vec pos, const std::vector<int64_t>& cableIds,
 		tie.color = nvgRGBA(235, 238, 242, 200); // Translucent natural nylon
 	}
 
-	zipTies.push_back(tie);
+	cableTies.push_back(tie);
 
 	// Insert into each cable's sequence at the appropriate topological index
 	for (int64_t cid : cableIds) {
@@ -93,18 +93,18 @@ int ZipTieModule::addZipTie(math::Vec pos, const std::vector<int64_t>& cableIds,
 		}
 	}
 
-	cachedTieCount = (int)zipTies.size();
+	cachedTieCount = (int)cableTies.size();
 	cachedWireCount = (int)cableTieSequences.size();
 	return tie.id;
 }
 
-void ZipTieModule::removeZipTie(int tieId) {
+void CableTieModule::removeCableTie(int tieId) {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 
-	// Remove from zipTies
-	zipTies.erase(std::remove_if(zipTies.begin(), zipTies.end(), [tieId](const ZipTie& z) {
+	// Remove from cableTies
+	cableTies.erase(std::remove_if(cableTies.begin(), cableTies.end(), [tieId](const CableTie& z) {
 		return z.id == tieId;
-	}), zipTies.end());
+	}), cableTies.end());
 
 	// Remove from all cable sequences
 	std::vector<int64_t> emptyCables;
@@ -127,13 +127,13 @@ void ZipTieModule::removeZipTie(int tieId) {
 		cableTieSequences.erase(cid);
 	}
 
-	cachedTieCount = (int)zipTies.size();
+	cachedTieCount = (int)cableTies.size();
 	cachedWireCount = (int)cableTieSequences.size();
 }
 
-void ZipTieModule::moveZipTie(int tieId, math::Vec newPos) {
+void CableTieModule::moveCableTie(int tieId, math::Vec newPos) {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
-	for (ZipTie& z : zipTies) {
+	for (CableTie& z : cableTies) {
 		if (z.id == tieId) {
 			z.pos = newPos;
 			break;
@@ -141,7 +141,7 @@ void ZipTieModule::moveZipTie(int tieId, math::Vec newPos) {
 	}
 }
 
-void ZipTieModule::clearAllZipTies() {
+void CableTieModule::clearAllCableTies() {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 	if (APP && APP->scene && APP->scene->rack) {
 		for (auto& pair : cableTieSequences) {
@@ -152,13 +152,13 @@ void ZipTieModule::clearAllZipTies() {
 			}
 		}
 	}
-	zipTies.clear();
+	cableTies.clear();
 	cableTieSequences.clear();
 	cachedTieCount = 0;
 	cachedWireCount = 0;
 }
 
-void ZipTieModule::cleanDeadCables(const std::unordered_map<int64_t, app::CableWidget*>& activeCables) {
+void CableTieModule::cleanDeadCables(const std::unordered_map<int64_t, app::CableWidget*>& activeCables) {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 
 	// Keep wire spacing & style synced with module params
@@ -166,7 +166,7 @@ void ZipTieModule::cleanDeadCables(const std::unordered_map<int64_t, app::CableW
 	int style = (int)params[PARAM_TIE_STYLE].getValue();
 	NVGcolor styleColor = (style == 1) ? nvgRGB(28, 30, 34) : nvgRGBA(235, 238, 242, 200);
 
-	for (ZipTie& z : zipTies) {
+	for (CableTie& z : cableTies) {
 		z.wireSpacing = currentSpacing;
 		z.color = styleColor;
 	}
@@ -183,34 +183,34 @@ void ZipTieModule::cleanDeadCables(const std::unordered_map<int64_t, app::CableW
 
 	for (int64_t cid : deadCables) {
 		cableTieSequences.erase(cid);
-		for (ZipTie& z : zipTies) {
+		for (CableTie& z : cableTies) {
 			z.removeCable(cid);
 		}
 	}
 
-	// Remove zip ties that have no cables left
-	zipTies.erase(std::remove_if(zipTies.begin(), zipTies.end(), [](const ZipTie& z) {
+	// Remove cable ties that have no cables left
+	cableTies.erase(std::remove_if(cableTies.begin(), cableTies.end(), [](const CableTie& z) {
 		return z.cableIds.empty();
-	}), zipTies.end());
+	}), cableTies.end());
 
-	cachedTieCount = (int)zipTies.size();
+	cachedTieCount = (int)cableTies.size();
 	cachedWireCount = (int)cableTieSequences.size();
 }
 
-bool ZipTieModule::isCableTied(int64_t cableId) const {
+bool CableTieModule::isCableTied(int64_t cableId) const {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 	auto it = cableTieSequences.find(cableId);
 	return it != cableTieSequences.end() && !it->second.empty();
 }
 
-const ZipTie* ZipTieModule::getZipTie(int tieId) const {
-	for (const ZipTie& z : zipTies) {
+const CableTie* CableTieModule::getCableTie(int tieId) const {
+	for (const CableTie& z : cableTies) {
 		if (z.id == tieId) return &z;
 	}
 	return nullptr;
 }
 
-json_t* ZipTieModule::dataToJson() {
+json_t* CableTieModule::dataToJson() {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
 	json_t* rootJ = json_object();
 
@@ -219,9 +219,9 @@ json_t* ZipTieModule::dataToJson() {
 	json_object_set_new(rootJ, "shortcutKey", json_integer(shortcutKey));
 	json_object_set_new(rootJ, "shortcutMods", json_integer(shortcutMods));
 
-	// Save zip ties
+	// Save cable ties
 	json_t* tiesJ = json_array();
-	for (const ZipTie& z : zipTies) {
+	for (const CableTie& z : cableTies) {
 		json_t* tieJ = json_object();
 		json_object_set_new(tieJ, "id", json_integer(z.id));
 		json_object_set_new(tieJ, "x", json_real(z.pos.x));
@@ -235,7 +235,7 @@ json_t* ZipTieModule::dataToJson() {
 		json_object_set_new(tieJ, "cableIds", cidsJ);
 		json_array_append_new(tiesJ, tieJ);
 	}
-	json_object_set_new(rootJ, "zipTies", tiesJ);
+	json_object_set_new(rootJ, "cableTies", tiesJ);
 
 	// Save cable sequences
 	json_t* seqsJ = json_object();
@@ -252,9 +252,9 @@ json_t* ZipTieModule::dataToJson() {
 	return rootJ;
 }
 
-void ZipTieModule::dataFromJson(json_t* rootJ) {
+void CableTieModule::dataFromJson(json_t* rootJ) {
 	std::lock_guard<std::recursive_mutex> lock(stateMutex);
-	clearAllZipTies();
+	clearAllCableTies();
 
 	json_t* armedJ = json_object_get(rootJ, "toolArmed");
 	if (armedJ) toolArmed = json_is_true(armedJ);
@@ -268,13 +268,13 @@ void ZipTieModule::dataFromJson(json_t* rootJ) {
 	json_t* shortcutModsJ = json_object_get(rootJ, "shortcutMods");
 	if (shortcutModsJ) shortcutMods = (int)json_integer_value(shortcutModsJ);
 
-	// Restore zip ties
-	json_t* tiesJ = json_object_get(rootJ, "zipTies");
+	// Restore cable ties
+	json_t* tiesJ = json_object_get(rootJ, "cableTies");
 	if (tiesJ && json_is_array(tiesJ)) {
 		size_t idx;
 		json_t* tieJ;
 		json_array_foreach(tiesJ, idx, tieJ) {
-			ZipTie z;
+			CableTie z;
 			json_t* idJ = json_object_get(tieJ, "id");
 			if (idJ) z.id = (int)json_integer_value(idJ);
 
@@ -293,7 +293,7 @@ void ZipTieModule::dataFromJson(json_t* rootJ) {
 					z.cableIds.push_back(json_integer_value(cidJ));
 				}
 			}
-			zipTies.push_back(z);
+			cableTies.push_back(z);
 		}
 	}
 
@@ -316,8 +316,8 @@ void ZipTieModule::dataFromJson(json_t* rootJ) {
 		}
 	}
 
-	cachedTieCount = (int)zipTies.size();
+	cachedTieCount = (int)cableTies.size();
 	cachedWireCount = (int)cableTieSequences.size();
 }
 
-} // namespace ZipTies
+} // namespace CableTies

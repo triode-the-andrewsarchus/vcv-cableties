@@ -1,22 +1,22 @@
 {
-  "slug": "vcv-zipties",
-  "name": "ZipTies",
+  "slug": "CableTies",
+  "name": "CableTies",
   "version": "2.0.0",
   "license": "GPL-3.0-or-later",
-  "brand": "ZipTies",
-  "author": "VCV",
+  "brand": "CableTies",
+  "author": "Vega Deftwing",
   "authorEmail": "",
-  "authorUrl": "",
+  "authorUrl": "https://opguides.info",
   "pluginUrl": "",
   "manualUrl": "",
-  "sourceUrl": "",
-  "donateUrl": "",
+  "sourceUrl": "https://github.com/triode-the-andrewsarchus/vcv-cableties",
+  "donateUrl": "https://github.com/sponsors/VegaDeftwing",
   "changelogUrl": "",
   "modules": [
     {
-      "slug": "ZipTie",
-      "name": "Zip Ties",
-      "description": "Wiring harness and cable zip tie manager",
+      "slug": "CableTie",
+      "name": "Cable Ties",
+      "description": "Wiring harness and cable tie manager",
       "tags": [
         "Utility",
         "Visual"

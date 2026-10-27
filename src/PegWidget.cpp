@@ -6,7 +6,7 @@
 #include <settings.hpp>
 #include <cmath>
 
-namespace ZipTies {
+namespace CableTies {
 
 // Helper to find all PegWidgets currently in the rack
 static std::vector<PegWidget*> getAllPegWidgets() {
@@ -949,4 +949,4 @@ void PegWidget::appendContextMenu(ui::Menu* menu) {
 
 Model* modelCablePegs = createModel<PegModule, PegWidget>("CablePegs");
 
-} // namespace ZipTies
+} // namespace CableTies

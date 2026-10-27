@@ -1,11 +1,11 @@
 #include "plugin.hpp"
-#include "ZipTieModule.hpp"
+#include "CableTieModule.hpp"
 #include "HarnessOverlayWidget.hpp"
 #include <app/RackWidget.hpp>
 #include <app/Scene.hpp>
 #include <cmath>
 
-namespace ZipTies {
+namespace CableTies {
 
 // ============================================================================
 // 0. NIM-BIN PANEL TYPOGRAPHY & HAZARD STRIPES OVERLAY
@@ -25,10 +25,10 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 		float cx = box.size.x * 0.5f;
 
 		// 1. Top NIM-BIN Header
-		nvgFontSize(vg, 12.5f);
-		nvgTextLetterSpacing(vg, 1.5f);
+		nvgFontSize(vg, 12.0f);
+		nvgTextLetterSpacing(vg, 1.2f);
 		nvgFillColor(vg, dark ? nvgRGB(236, 240, 246) : nvgRGB(26, 30, 34));
-		nvgText(vg, cx + 0.5f, 25.0f, "ZIP-TIE", NULL);
+		nvgText(vg, cx + 0.5f, 25.0f, "CABLE-TIE", NULL);
 
 		// Terracotta subtitle badge ("Wire Harness")
 		const char* badgeText = "Wire Harness";
@@ -135,7 +135,7 @@ struct NimPanelGraphicsWidget : widget::TransparentWidget {
 // 1. SCOTCH TAPE + SHARPIE SHORTCUT DISPLAY
 // ============================================================================
 struct ScotchTapeWidget : widget::TransparentWidget {
-	ZipTieModule* module = nullptr;
+	CableTieModule* module = nullptr;
 	std::string fontPath;
 
 	ScotchTapeWidget() {
@@ -228,7 +228,7 @@ struct ScotchTapeWidget : widget::TransparentWidget {
 		nvgStroke(vg);
 
 		// Sharpie Marker Text
-		std::string label = "Z";
+		std::string label = "C";
 		bool isLearning = false;
 		if (module) {
 			if (module->learningKey) {
@@ -293,10 +293,10 @@ struct ScotchTapeWidget : widget::TransparentWidget {
 };
 
 // ============================================================================
-// 2. RECTANGULAR TOP BUTTON WITH ZIP-TIE ICON
+// 2. RECTANGULAR TOP BUTTON WITH CABLE-TIE ICON
 // ============================================================================
-struct RectangularZipTieButton : widget::OpaqueWidget {
-	ZipTieModule* module = nullptr;
+struct RectangularCableTieButton : widget::OpaqueWidget {
+	CableTieModule* module = nullptr;
 	bool momentaryPressed = false;
 
 	void onButton(const ButtonEvent& e) override {
@@ -398,13 +398,13 @@ struct RectangularZipTieButton : widget::OpaqueWidget {
 		nvgStroke(vg);
 
 		// --------------------------------------------------------------------
-		// DRAW ZIP-TIE ICON ON RECTANGULAR BUTTON CAP
+		// DRAW CABLE-TIE ICON ON RECTANGULAR BUTTON CAP
 		// --------------------------------------------------------------------
 		float cy = capY + capH * 0.5f;
 		NVGcolor iconCol = armed ? nvgRGB(255, 250, 235) : nvgRGB(218, 223, 216);
 		NVGcolor iconDark = armed ? nvgRGB(95, 28, 8) : nvgRGB(24, 27, 30);
 
-		// 1. Zip Tie Ratchet Locking Head (left side)
+		// 1. Cable Tie Ratchet Locking Head (left side)
 		float headX = capX + 6.0f;
 		float headY = cy - 5.5f;
 		float headW = 9.0f;
@@ -427,7 +427,7 @@ struct RectangularZipTieButton : widget::OpaqueWidget {
 		nvgFillColor(vg, iconCol);
 		nvgFill(vg);
 
-		// 2. Zip Tie Strap Body with Serrated Teeth (extending right from head)
+		// 2. Cable Tie Strap Body with Serrated Teeth (extending right from head)
 		float strapX = headX + headW - 0.5f;
 		float strapH = 5.4f;
 		float strapY = cy - strapH * 0.5f;
@@ -488,7 +488,7 @@ struct RectangularZipTieButton : widget::OpaqueWidget {
 //    - Snug pass-through slots on left/right with zero excess black space
 // ============================================================================
 struct WirePreviewWidget : widget::TransparentWidget {
-	ZipTieModule* module = nullptr;
+	CableTieModule* module = nullptr;
 
 	void draw(const DrawArgs& args) override {
 		NVGcontext* vg = args.vg;
@@ -502,8 +502,8 @@ struct WirePreviewWidget : widget::TransparentWidget {
 		float rawSpacing = 6.0f;
 		int tieStyle = 0;
 		if (module) {
-			rawSpacing = module->params[ZipTieModule::PARAM_WIRE_SPACING].getValue();
-			tieStyle = (int)std::round(module->params[ZipTieModule::PARAM_TIE_STYLE].getValue());
+			rawSpacing = module->params[CableTieModule::PARAM_WIRE_SPACING].getValue();
+			tieStyle = (int)std::round(module->params[CableTieModule::PARAM_TIE_STYLE].getValue());
 		}
 
 		// Wire thickness matches real Rack cables (6.0f outer, 5.0f inner)
@@ -669,7 +669,7 @@ struct WirePreviewWidget : widget::TransparentWidget {
 		drawPassThroughHood(leftX, cy + endBowY, true);
 		drawPassThroughHood(rightX, cy + endBowY, false);
 
-		// 6. Draw Miniature Zip Tie cinching the 3 preview wires at midX
+		// 6. Draw Miniature Cable Tie cinching the 3 preview wires at midX
 		float bundleCenterY = cy + midBowY;
 		float tieH = 2.0f * pitch + wireOuter + 5.0f;
 		float tieW = 5.5f;
@@ -681,13 +681,13 @@ struct WirePreviewWidget : widget::TransparentWidget {
 			? nvgRGB(28, 30, 34)
 			: nvgRGBA(235, 238, 242, 205);
 
-		// Mini zip tie drop shadow
+		// Mini cable tie drop shadow
 		nvgBeginPath(vg);
 		nvgRoundedRect(vg, tieX + 1.0f, tieY + 1.5f, tieW, tieH, 2.0f);
 		nvgFillColor(vg, nvgRGBA(0, 0, 0, 65));
 		nvgFill(vg);
 
-		// Mini zip tie strap body
+		// Mini cable tie strap body
 		nvgBeginPath(vg);
 		nvgRoundedRect(vg, tieX, tieY, tieW, tieH, 2.0f);
 		nvgFillColor(vg, tieBodyCol);
@@ -696,7 +696,7 @@ struct WirePreviewWidget : widget::TransparentWidget {
 		nvgStrokeWidth(vg, 0.85f);
 		nvgStroke(vg);
 
-		// Mini zip tie buckle head at top of bundle
+		// Mini cable tie buckle head at top of bundle
 		float headW = tieW + 1.8f;
 		float headH = 4.0f;
 		nvgBeginPath(vg);
@@ -770,7 +770,7 @@ struct NimInstrumentKnob : RoundBlackKnob {
 // 5. MOLLY-GUARD DANGER DELETE-ALL BUTTON (2 CLICKS WITHIN < 1.0 SECOND)
 // ============================================================================
 struct MollyGuardSnipButton : widget::OpaqueWidget {
-	ZipTieModule* module = nullptr;
+	CableTieModule* module = nullptr;
 	bool guardOpen = false;
 	double guardOpenTime = -10.0;
 	double buttonPressTime = -10.0;
@@ -800,7 +800,7 @@ struct MollyGuardSnipButton : widget::OpaqueWidget {
 				// SECOND CLICK WITHIN < 1 SECOND: Press the danger button & snip all ties!
 				buttonPressTime = now;
 				if (module) {
-					module->clearAllZipTies();
+					module->clearAllCableTies();
 				}
 				guardOpen = false;
 			}
@@ -1048,7 +1048,7 @@ struct MollyGuardSnipButton : widget::OpaqueWidget {
 // 6. RIGHT-CLICK MENU KEY BINDER ITEM
 // ============================================================================
 struct ShortcutBindMenuItem : ui::MenuItem {
-	ZipTieModule* module = nullptr;
+	CableTieModule* module = nullptr;
 	HarnessOverlayWidget* overlay = nullptr;
 
 	void step() override {
@@ -1102,14 +1102,14 @@ struct ShortcutBindMenuItem : ui::MenuItem {
 // ============================================================================
 // 7. MAIN MODULE WIDGET
 // ============================================================================
-struct ZipTieWidget : app::ModuleWidget {
+struct CableTieWidget : app::ModuleWidget {
 	HarnessOverlayWidget* overlayWidget = nullptr;
 
-	ZipTieWidget(ZipTieModule* module) {
+	CableTieWidget(CableTieModule* module) {
 		setModule(module);
 		setPanel(createPanel(
-			asset::plugin(pluginInstance, "res/ZipTie.svg"),
-			asset::plugin(pluginInstance, "res/ZipTie_dark.svg")
+			asset::plugin(pluginInstance, "res/CableTie.svg"),
+			asset::plugin(pluginInstance, "res/CableTie_dark.svg")
 		));
 
 		// 0. NIM-BIN Panel Typography & Hazard Stripes Overlay
@@ -1131,8 +1131,8 @@ struct ZipTieWidget : app::ModuleWidget {
 		tapeWidget->box.size = math::Vec(74, 38);
 		addChild(tapeWidget);
 
-		// 2. Rectangular Top Button with Zip-Tie Icon (Arm Tool)
-		RectangularZipTieButton* armBtn = new RectangularZipTieButton;
+		// 2. Rectangular Top Button with Cable-Tie Icon (Arm Tool)
+		RectangularCableTieButton* armBtn = new RectangularCableTieButton;
 		armBtn->module = module;
 		armBtn->box.pos = math::Vec(16, 122);
 		armBtn->box.size = math::Vec(58, 30);
@@ -1147,7 +1147,7 @@ struct ZipTieWidget : app::ModuleWidget {
 
 		// 4. Spacing Knob (defaults all the way up at 6.0f)
 		addParam(createParamCentered<NimInstrumentKnob>(
-			math::Vec(45, 250), module, ZipTieModule::PARAM_WIRE_SPACING));
+			math::Vec(45, 250), module, CableTieModule::PARAM_WIRE_SPACING));
 
 		// 5. Dangerous Delete-All Button with Flip-Up Molly-Guard (2 clicks < 1s)
 		MollyGuardSnipButton* mollyBtn = new MollyGuardSnipButton;
@@ -1162,7 +1162,7 @@ struct ZipTieWidget : app::ModuleWidget {
 		}
 	}
 
-	~ZipTieWidget() override {
+	~CableTieWidget() override {
 		HarnessOverlayWidget::release(this);
 		overlayWidget = nullptr;
 	}
@@ -1176,7 +1176,7 @@ struct ZipTieWidget : app::ModuleWidget {
 
 	void appendContextMenu(ui::Menu* menu) override {
 		ModuleWidget::appendContextMenu(menu);
-		ZipTieModule* m = dynamic_cast<ZipTieModule*>(module);
+		CableTieModule* m = dynamic_cast<CableTieModule*>(module);
 		if (!m) return;
 
 		menu->addChild(new ui::MenuSeparator);
@@ -1190,9 +1190,9 @@ struct ZipTieWidget : app::ModuleWidget {
 
 		// Preset Shortcuts submenu
 		menu->addChild(createSubmenuItem("Preset Shortcuts", m->getShortcutName(), [m](ui::Menu* sub) {
-			sub->addChild(createCheckMenuItem("Hold 'Z' (Default)", "",
-				[m]() { return m->shortcutKey == GLFW_KEY_Z && m->shortcutMods == 0; },
-				[m]() { m->setShortcut(GLFW_KEY_Z, 0); }
+			sub->addChild(createCheckMenuItem("Hold 'C' (Default)", "",
+				[m]() { return m->shortcutKey == GLFW_KEY_C && m->shortcutMods == 0; },
+				[m]() { m->setShortcut(GLFW_KEY_C, 0); }
 			));
 			sub->addChild(createCheckMenuItem("Hold 'T'", "",
 				[m]() { return m->shortcutKey == GLFW_KEY_T && m->shortcutMods == 0; },
@@ -1202,9 +1202,9 @@ struct ZipTieWidget : app::ModuleWidget {
 				[m]() { return m->shortcutKey == GLFW_KEY_X && m->shortcutMods == 0; },
 				[m]() { m->setShortcut(GLFW_KEY_X, 0); }
 			));
-			sub->addChild(createCheckMenuItem("Hold Shift + 'Z'", "",
-				[m]() { return m->shortcutKey == GLFW_KEY_Z && m->shortcutMods == GLFW_MOD_SHIFT; },
-				[m]() { m->setShortcut(GLFW_KEY_Z, GLFW_MOD_SHIFT); }
+			sub->addChild(createCheckMenuItem("Hold Shift + 'C'", "",
+				[m]() { return m->shortcutKey == GLFW_KEY_C && m->shortcutMods == GLFW_MOD_SHIFT; },
+				[m]() { m->setShortcut(GLFW_KEY_C, GLFW_MOD_SHIFT); }
 			));
 			sub->addChild(createCheckMenuItem("Hold " RACK_MOD_CTRL_NAME "+Shift", "",
 				[m]() { return m->shortcutKey == 0 && m->shortcutMods == (RACK_MOD_CTRL | GLFW_MOD_SHIFT); },
@@ -1217,15 +1217,15 @@ struct ZipTieWidget : app::ModuleWidget {
 		}));
 
 		menu->addChild(new ui::MenuSeparator);
-		menu->addChild(createMenuLabel("Zip Tie Color"));
+		menu->addChild(createMenuLabel("Cable Tie Color"));
 
 		menu->addChild(createCheckMenuItem("Translucent (Default)", "",
-			[m]() { return (int)std::round(m->params[ZipTieModule::PARAM_TIE_STYLE].getValue()) == 0; },
-			[m]() { m->params[ZipTieModule::PARAM_TIE_STYLE].setValue(0.f); }
+			[m]() { return (int)std::round(m->params[CableTieModule::PARAM_TIE_STYLE].getValue()) == 0; },
+			[m]() { m->params[CableTieModule::PARAM_TIE_STYLE].setValue(0.f); }
 		));
 		menu->addChild(createCheckMenuItem("Black", "",
-			[m]() { return (int)std::round(m->params[ZipTieModule::PARAM_TIE_STYLE].getValue()) == 1; },
-			[m]() { m->params[ZipTieModule::PARAM_TIE_STYLE].setValue(1.f); }
+			[m]() { return (int)std::round(m->params[CableTieModule::PARAM_TIE_STYLE].getValue()) == 1; },
+			[m]() { m->params[CableTieModule::PARAM_TIE_STYLE].setValue(1.f); }
 		));
 
 		menu->addChild(new ui::MenuSeparator);
@@ -1241,15 +1241,15 @@ struct ZipTieWidget : app::ModuleWidget {
 
 		// Snip All Action
 		menu->addChild(createMenuItem(
-			"Snip All Zip Ties",
+			"Snip All Cable Ties",
 			"",
 			[m]() {
-				m->clearAllZipTies();
+				m->clearAllCableTies();
 			}
 		));
 	}
 };
 
-Model* modelZipTie = createModel<ZipTieModule, ZipTieWidget>("ZipTie");
+Model* modelCableTie = createModel<CableTieModule, CableTieWidget>("CableTie");
 
-} // namespace ZipTies
+} // namespace CableTies

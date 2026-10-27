@@ -6,7 +6,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace ZipTies {
+namespace CableTies {
 
 static HarnessOverlayWidget* gSharedOverlay = nullptr;
 
@@ -38,7 +38,7 @@ HarnessOverlayWidget* HarnessOverlayWidget::acquire(app::ModuleWidget* mw) {
 	}
 
 	gSharedOverlay->registeredWidgets.insert(mw);
-	if (ZipTieModule* zm = dynamic_cast<ZipTieModule*>(mw->module)) {
+	if (CableTieModule* zm = dynamic_cast<CableTieModule*>(mw->module)) {
 		gSharedOverlay->module = zm;
 		gSharedOverlay->ownerMw = mw;
 	}
@@ -52,10 +52,10 @@ void HarnessOverlayWidget::release(app::ModuleWidget* mw) {
 	if (gSharedOverlay->ownerMw == mw) {
 		gSharedOverlay->ownerMw = nullptr;
 		gSharedOverlay->module = nullptr;
-		// Check if another ZipTieModule is registered
+		// Check if another CableTieModule is registered
 		for (app::ModuleWidget* other : gSharedOverlay->registeredWidgets) {
 			if (other && other->module) {
-				if (ZipTieModule* zm = dynamic_cast<ZipTieModule*>(other->module)) {
+				if (CableTieModule* zm = dynamic_cast<CableTieModule*>(other->module)) {
 					gSharedOverlay->module = zm;
 					gSharedOverlay->ownerMw = other;
 					break;
@@ -769,7 +769,7 @@ static std::vector<math::Vec> routeSegmentAroundObstacles(
 void HarnessOverlayWidget::step() {
 	// Process any pending clear request signaled lock-free by the audio thread or reset
 	if (module && module->clearRequested.exchange(false, std::memory_order_relaxed)) {
-		module->clearAllZipTies();
+		module->clearAllCableTies();
 	}
 
 	// Keep overlay matched to rack dimensions
@@ -807,11 +807,11 @@ void HarnessOverlayWidget::step() {
 		updateCutIntersections();
 	}
 
-	// Hit test zip ties for hover state
+	// Hit test cable ties for hover state
 	hoveredTieId = -1;
 	if (module && APP && APP->scene && APP->scene->rack) {
 		math::Vec mouse = APP->scene->rack->getMousePos();
-		for (const ZipTie& z : module->zipTies) {
+		for (const CableTie& z : module->cableTies) {
 			if (mouse.minus(z.pos).norm() <= 16.0f) {
 				hoveredTieId = z.id;
 				break;
@@ -872,7 +872,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 				p1 = p0.plus(slump.minus(p0).mult(2.0f / 3.0f));
 				p2 = p3.plus(slump.minus(p3).mult(2.0f / 3.0f));
 			}
-			// CASE 3: Zip-tied cable segments (Port <-> Tie, Tie <-> Tie, or Tie <-> Peg)
+			// CASE 3: Cable-tied cable segments (Port <-> Tie, Tie <-> Tie, or Tie <-> Peg)
 			else {
 				math::Vec t0 = w0.tangent;
 				math::Vec t1 = w1.tangent;
@@ -951,13 +951,13 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 	};
 
 	// ========================================================================
-	// PART A: TIED CABLES (When ZipTieModule is present)
+	// PART A: TIED CABLES (When CableTieModule is present)
 	// ========================================================================
 	if (module) {
 		std::lock_guard<std::recursive_mutex> lock(module->stateMutex);
 
-		// STEP 1: Compute Tangent, Normal, and Ordered Wires for each Zip Tie
-		for (ZipTie& z : module->zipTies) {
+		// STEP 1: Compute Tangent, Normal, and Ordered Wires for each Cable Tie
+		for (CableTie& z : module->cableTies) {
 			math::Vec inVec(0.f, 0.f);
 			math::Vec outVec(0.f, 0.f);
 			int inCount = 0;
@@ -980,7 +980,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 					prevPoint = cw->getOutputPos();
 				}
 				else {
-					const ZipTie* pz = module->getZipTie(seq[idx - 1]);
+					const CableTie* pz = module->getCableTie(seq[idx - 1]);
 					prevPoint = pz ? pz->pos : cw->getOutputPos();
 				}
 				inVec = inVec.plus(z.pos.minus(prevPoint).normalize());
@@ -991,7 +991,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 					nextPoint = cw->getInputPos();
 				}
 				else {
-					const ZipTie* nz = module->getZipTie(seq[idx + 1]);
+					const CableTie* nz = module->getCableTie(seq[idx + 1]);
 					nextPoint = nz ? nz->pos : cw->getInputPos();
 				}
 				outVec = outVec.plus(nextPoint.minus(z.pos).normalize());
@@ -1059,10 +1059,10 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 			std::vector<TiedNode> nodes;
 			nodes.reserve(seq.size() + 2);
 
-			// Output Port node: compute average output port position of all cables sharing the first zip tie
+			// Output Port node: compute average output port position of all cables sharing the first cable tie
 			math::Vec firstBundleOut = outPos;
 			float firstOffset = 0.f;
-			if (const ZipTie* firstZ = module->getZipTie(seq.front())) {
+			if (const CableTie* firstZ = module->getCableTie(seq.front())) {
 				math::Vec sumOut(0.f, 0.f);
 				int cntOut = 0;
 				for (int64_t bcid : firstZ->cableIds) {
@@ -1079,7 +1079,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 			nodes.push_back(TiedNode(outPos, firstBundleOut, math::Vec(0.f, 1.f), firstOffset, true));
 
 			for (int tid : seq) {
-				const ZipTie* z = module->getZipTie(tid);
+				const CableTie* z = module->getCableTie(tid);
 				if (!z) continue;
 
 				int wireIdx = 0;
@@ -1094,10 +1094,10 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 				nodes.push_back(TiedNode(wirePos, z->pos, z->tangent, offset, false));
 			}
 
-			// Input Port node: compute average input port position of all cables sharing the last zip tie
+			// Input Port node: compute average input port position of all cables sharing the last cable tie
 			math::Vec lastBundleIn = inPos;
 			float lastOffset = 0.f;
-			if (const ZipTie* lastZ = module->getZipTie(seq.back())) {
+			if (const CableTie* lastZ = module->getCableTie(seq.back())) {
 				math::Vec sumIn(0.f, 0.f);
 				int cntIn = 0;
 				for (int64_t bcid : lastZ->cableIds) {
@@ -1119,7 +1119,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 				finalWaypoints.push_back(Waypoint(nodes[i].wirePos, nodes[i].tangent, nodes[i].isPort));
 
 				if (i + 1 < nodes.size() && !cachedObstacles.empty()) {
-					// Route using the bundle centerline so all wires in a zip-tied group deflect together around the same peg!
+					// Route using the bundle centerline so all wires in a cable-tied group deflect together around the same peg!
 					std::vector<math::Vec> detours = routeSegmentAroundObstacles(
 						nodes[i].bundleCenterPos,
 						nodes[i + 1].bundleCenterPos,
@@ -1204,7 +1204,7 @@ void HarnessOverlayWidget::updateCablePaths(const std::unordered_map<int64_t, ap
 				restoreCablePlugs(cw);
 			}
 
-			// If user is actively slicing, sample the normal slumped cable for zip-tie cut intersections
+			// If user is actively slicing, sample the normal slumped cable for cable-tie cut intersections
 			if (isCutting) {
 				CablePath cp;
 				cp.cableId = cid;
@@ -1290,7 +1290,7 @@ void HarnessOverlayWidget::updateCutIntersections() {
 }
 
 void HarnessOverlayWidget::onButton(const ButtonEvent& e) {
-	// Always allow clicks on any registered ZipTie or Peg module panel to pass through
+	// Always allow clicks on any registered CableTie or Peg module panel to pass through
 	// so the user can toggle ARM TOOL, SNIP ALL, Vertical LINK buttons, or right-click menus at any time
 	for (app::ModuleWidget* mw : registeredWidgets) {
 		if (mw && mw->box.contains(e.pos)) {
@@ -1323,8 +1323,8 @@ void HarnessOverlayWidget::onButton(const ButtonEvent& e) {
 			return;
 		}
 
-		// 2. If shortcut is not active, check if clicking on an existing zip tie to drag it
-		for (const ZipTie& z : module->zipTies) {
+		// 2. If shortcut is not active, check if clicking on an existing cable tie to drag it
+		for (const CableTie& z : module->cableTies) {
 			if (e.pos.minus(z.pos).norm() <= 16.0f) {
 				draggedTieId = z.id;
 				dragOffset = e.pos.minus(z.pos);
@@ -1334,11 +1334,11 @@ void HarnessOverlayWidget::onButton(const ButtonEvent& e) {
 		}
 	}
 
-	// Right click handling: delete zip tie
+	// Right click handling: delete cable tie
 	if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_RIGHT) {
-		for (const ZipTie& z : module->zipTies) {
+		for (const CableTie& z : module->cableTies) {
 			if (e.pos.minus(z.pos).norm() <= 16.0f) {
-				module->removeZipTie(z.id);
+				module->removeCableTie(z.id);
 				hoveredTieId = -1;
 				e.consume(this);
 				return;
@@ -1361,7 +1361,7 @@ void HarnessOverlayWidget::onButton(const ButtonEvent& e) {
 				}
 
 				math::Vec centroid = sum.div((float)intersectedCables.size());
-				module->addZipTie(centroid, cableIds, insertPositions);
+				module->addCableTie(centroid, cableIds, insertPositions);
 			}
 			isCutting = false;
 			intersectedCables.clear();
@@ -1390,7 +1390,7 @@ void HarnessOverlayWidget::onDragStart(const DragStartEvent& e) {
 void HarnessOverlayWidget::onDragMove(const DragMoveEvent& e) {
 	if (draggedTieId != -1 && module) {
 		math::Vec newPos = APP->scene->rack->getMousePos().minus(dragOffset);
-		module->moveZipTie(draggedTieId, newPos);
+		module->moveCableTie(draggedTieId, newPos);
 		e.consume(this);
 		return;
 	}
@@ -1419,7 +1419,7 @@ void HarnessOverlayWidget::onDragEnd(const DragEndEvent& e) {
 			}
 
 			math::Vec centroid = sum.div((float)intersectedCables.size());
-			module->addZipTie(centroid, cableIds, insertPositions);
+			module->addCableTie(centroid, cableIds, insertPositions);
 		}
 		isCutting = false;
 		intersectedCables.clear();
@@ -1627,10 +1627,10 @@ void HarnessOverlayWidget::drawLayer(const DrawArgs& args, int layer) {
 	}
 
 	// -------------------------------------------------------------
-	// 4. DRAW ZIP TIE BANDS
+	// 4. DRAW CABLE TIE BANDS
 	// -------------------------------------------------------------
 	if (module) {
-		for (const ZipTie& z : module->zipTies) {
+		for (const CableTie& z : module->cableTies) {
 			int numWires = (int)z.cableIds.size();
 			if (numWires == 0) continue;
 
@@ -1647,14 +1647,14 @@ void HarnessOverlayWidget::drawLayer(const DrawArgs& args, int layer) {
 			float angle = std::atan2(z.normal.y, z.normal.x);
 			nvgRotate(vg, angle);
 
-			// Zip Tie Drop Shadow
+			// Cable Tie Drop Shadow
 			float shadowOffset = isDragged ? 4.0f : 2.0f;
 			nvgBeginPath(vg);
 			nvgRoundedRect(vg, -bandLength * 0.5f - 1.f, -bandThickness * 0.5f + shadowOffset, bandLength + 2.f, bandThickness, 3.0f);
 			nvgFillColor(vg, nvgRGBAf(0.f, 0.f, 0.f, isDragged ? 0.35f : 0.25f));
 			nvgFill(vg);
 
-			// Zip Tie Body
+			// Cable Tie Body
 			nvgBeginPath(vg);
 			nvgRoundedRect(vg, -bandLength * 0.5f, -bandThickness * 0.5f, bandLength, bandThickness, 3.0f);
 			nvgFillColor(vg, z.color);
@@ -1667,7 +1667,7 @@ void HarnessOverlayWidget::drawLayer(const DrawArgs& args, int layer) {
 			nvgStrokeWidth(vg, isHovered ? 1.5f : 1.0f);
 			nvgStroke(vg);
 
-			// Zip Tie Lock Clasp / Buckle Head
+			// Cable Tie Lock Clasp / Buckle Head
 			float claspW = 5.0f;
 			float claspH = bandThickness + 3.0f;
 			float claspX = bandLength * 0.5f - claspW - 0.5f;
@@ -1772,4 +1772,4 @@ void HarnessOverlayWidget::drawLayer(const DrawArgs& args, int layer) {
 	TransparentWidget::drawLayer(args, layer);
 }
 
-} // namespace ZipTies
+} // namespace CableTies

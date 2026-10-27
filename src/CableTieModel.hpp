@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace ZipTies {
+namespace CableTies {
 
 using namespace rack;
 
@@ -71,9 +71,9 @@ inline math::Vec evalQuadBezier(math::Vec p0, math::Vec p1, math::Vec p2, float 
 }
 
 /**
- * Represents a single Zip Tie in the rack.
+ * Represents a single Cable Tie in the rack.
  */
-struct ZipTie {
+struct CableTie {
 	int id = 0;
 	math::Vec pos;                       // Position in rack coordinates
 	std::vector<int64_t> cableIds;       // IDs of cables passing through this tie
@@ -119,4 +119,4 @@ struct CablePath {
 	std::vector<int> sampleSegmentIndices; // Which segment each sample came from
 };
 
-} // namespace ZipTies
+} // namespace CableTies

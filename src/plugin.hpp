@@ -5,7 +5,7 @@ using namespace rack;
 
 extern Plugin* pluginInstance;
 
-namespace ZipTies {
-extern Model* modelZipTie;
+namespace CableTies {
+extern Model* modelCableTie;
 extern Model* modelCablePegs;
 }

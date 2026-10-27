@@ -1,7 +1,7 @@
 #pragma once
 #include <rack.hpp>
 
-namespace ZipTies {
+namespace CableTies {
 
 using namespace rack;
 
@@ -111,4 +111,4 @@ struct PegWidget : app::ModuleWidget {
 	void appendContextMenu(ui::Menu* menu) override;
 };
 
-} // namespace ZipTies
+} // namespace CableTies

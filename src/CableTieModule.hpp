@@ -1,13 +1,13 @@
 #pragma once
 #include <rack.hpp>
-#include "ZipTieModel.hpp"
+#include "CableTieModel.hpp"
 #include <atomic>
 #include <map>
 #include <unordered_map>
 #include <vector>
 #include <mutex>
 
-namespace ZipTies {
+namespace CableTies {
 
 using namespace rack;
 
@@ -119,7 +119,7 @@ inline void restoreCablePlugs(app::CableWidget* cw) {
 	setPlugRotation(cw->inputPlug, slump.minus(inPos).arg());
 }
 
-struct ZipTieModule : engine::Module {
+struct CableTieModule : engine::Module {
 	enum ParamIds {
 		PARAM_ARM_TOOL,
 		PARAM_WIRE_SPACING,
@@ -140,12 +140,12 @@ struct ZipTieModule : engine::Module {
 
 	// State
 	mutable std::recursive_mutex stateMutex;
-	std::vector<ZipTie> zipTies;
+	std::vector<CableTie> cableTies;
 	std::map<int64_t, std::vector<int>> cableTieSequences;
 	int nextTieId = 1;
 
 	// User-configurable shortcut key & modifiers (chosen in right-click menu)
-	int shortcutKey = GLFW_KEY_Z;
+	int shortcutKey = GLFW_KEY_C;
 	int shortcutMods = 0;
 	bool learningKey = false;
 	int pendingMods = 0;
@@ -160,8 +160,8 @@ struct ZipTieModule : engine::Module {
 	int cachedTieCount = 0;
 	int cachedWireCount = 0;
 
-	ZipTieModule();
-	~ZipTieModule() override;
+	CableTieModule();
+	~CableTieModule() override;
 
 	void process(const ProcessArgs& args) override;
 	void onReset(const ResetEvent& e) override;
@@ -177,18 +177,18 @@ struct ZipTieModule : engine::Module {
 		pendingMods = 0;
 	}
 
-	// Zip tie management
-	int addZipTie(math::Vec pos, const std::vector<int64_t>& cableIds, const std::map<int64_t, int>& insertPositions);
-	void removeZipTie(int tieId);
-	void moveZipTie(int tieId, math::Vec newPos);
-	void clearAllZipTies();
+	// Cable tie management
+	int addCableTie(math::Vec pos, const std::vector<int64_t>& cableIds, const std::map<int64_t, int>& insertPositions);
+	void removeCableTie(int tieId);
+	void moveCableTie(int tieId, math::Vec newPos);
+	void clearAllCableTies();
 	void cleanDeadCables(const std::unordered_map<int64_t, app::CableWidget*>& activeCables);
 	bool isCableTied(int64_t cableId) const;
-	const ZipTie* getZipTie(int tieId) const;
+	const CableTie* getCableTie(int tieId) const;
 
 	// JSON serialization
 	json_t* dataToJson() override;
 	void dataFromJson(json_t* rootJ) override;
 };
 
-} // namespace ZipTies
+} // namespace CableTies

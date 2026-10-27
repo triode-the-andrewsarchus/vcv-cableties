@@ -1,14 +1,14 @@
 #pragma once
 #include <rack.hpp>
-#include "ZipTieModel.hpp"
-#include "ZipTieModule.hpp"
+#include "CableTieModel.hpp"
+#include "CableTieModule.hpp"
 #include "PegModule.hpp"
 #include <vector>
 #include <map>
 #include <set>
 #include <unordered_set>
 
-namespace ZipTies {
+namespace CableTies {
 
 using namespace rack;
 
@@ -56,7 +56,7 @@ struct ActivePegCap {
 };
 
 struct HarnessOverlayWidget : widget::TransparentWidget {
-	ZipTieModule* module = nullptr;
+	CableTieModule* module = nullptr;
 	app::ModuleWidget* ownerMw = nullptr;
 	std::set<app::ModuleWidget*> registeredWidgets;
 
@@ -66,7 +66,7 @@ struct HarnessOverlayWidget : widget::TransparentWidget {
 	math::Vec cutCurrentPos;
 	std::vector<IntersectedCableInfo> intersectedCables;
 
-	// Dragging existing zip tie state
+	// Dragging existing cable tie state
 	int draggedTieId = -1;
 	math::Vec dragOffset;
 	int hoveredTieId = -1;
@@ -102,4 +102,4 @@ struct HarnessOverlayWidget : widget::TransparentWidget {
 	void updateCutIntersections();
 };
 
-} // namespace ZipTies
+} // namespace CableTies
