@@ -31,6 +31,24 @@ struct KeepOutObstacle {
 	float pegRightX = 0.f;
 	float pegTopY = 0.f;
 	float pegBotY = 0.f;
+
+	// Per-column peg Y positions for 2D keep-out quadrilaterals (when linked columns differ in height)
+	float pegLeftTopY = 0.f;
+	float pegLeftBotY = 0.f;
+	float pegRightTopY = 0.f;
+	float pegRightBotY = 0.f;
+
+	float pegTopAtX(float x) const {
+		if (!isBox || pegRightX <= pegLeftX + 1e-3f) return pegTopY;
+		float t = math::clamp((x - pegLeftX) / (pegRightX - pegLeftX), 0.f, 1.f);
+		return pegLeftTopY + t * (pegRightTopY - pegLeftTopY);
+	}
+
+	float pegBotAtX(float x) const {
+		if (!isBox || pegRightX <= pegLeftX + 1e-3f) return pegBotY;
+		float t = math::clamp((x - pegLeftX) / (pegRightX - pegLeftX), 0.f, 1.f);
+		return pegLeftBotY + t * (pegRightBotY - pegLeftBotY);
+	}
 };
 
 struct ActivePegCap {

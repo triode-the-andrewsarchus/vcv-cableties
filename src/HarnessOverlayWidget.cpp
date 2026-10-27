@@ -292,10 +292,12 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 
 				const PegColumn& col1 = columns[cMin];
 				const PegColumn& col2 = columns[cMax];
-				float leftX = std::min(col1.x, col2.x);
-				float rightX = std::max(col1.x, col2.x);
-				float topY = std::min(col1.yTop, col2.yTop);
-				float botY = std::max(col1.yBot, col2.yBot);
+				const PegColumn& leftCol = (col1.x <= col2.x) ? col1 : col2;
+				const PegColumn& rightCol = (col1.x <= col2.x) ? col2 : col1;
+				float leftX = leftCol.x;
+				float rightX = rightCol.x;
+				float topY = std::min(leftCol.yTop, rightCol.yTop);
+				float botY = std::max(leftCol.yBot, rightCol.yBot);
 
 				KeepOutObstacle obs;
 				obs.isBox = true;
@@ -303,6 +305,10 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 				obs.pegRightX = rightX;
 				obs.pegTopY = topY;
 				obs.pegBotY = botY;
+				obs.pegLeftTopY = leftCol.yTop;
+				obs.pegLeftBotY = leftCol.yBot;
+				obs.pegRightTopY = rightCol.yTop;
+				obs.pegRightBotY = rightCol.yBot;
 				obs.xMin = leftX - PEG_CLEARANCE;
 				obs.xMax = rightX + PEG_CLEARANCE;
 				obs.yTop = topY - PEG_CLEARANCE;
@@ -326,6 +332,10 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 			obs.pegRightX = col.x;
 			obs.pegTopY = col.yTop;
 			obs.pegBotY = col.yBot;
+			obs.pegLeftTopY = col.yTop;
+			obs.pegLeftBotY = col.yBot;
+			obs.pegRightTopY = col.yTop;
+			obs.pegRightBotY = col.yBot;
 			obs.xMin = col.x - PEG_CLEARANCE;
 			obs.xMax = col.x + PEG_CLEARANCE;
 			obs.yTop = col.yTop - PEG_CLEARANCE;
@@ -336,8 +346,10 @@ void HarnessOverlayWidget::buildKeepOutObstacles() {
 
 static bool pointInsideObstacle(math::Vec p, const KeepOutObstacle& obs, float pad = -2.0f) {
 	if (obs.isBox) {
-		return p.x > (obs.xMin - pad) && p.x < (obs.xMax + pad) &&
-		       p.y > (obs.yTop - pad) && p.y < (obs.yBot + pad);
+		if (p.x <= (obs.xMin - pad) || p.x >= (obs.xMax + pad)) return false;
+		float yTopAtX = obs.pegTopAtX(p.x) - 11.0f;
+		float yBotAtX = obs.pegBotAtX(p.x) + 11.0f;
+		return p.y > (yTopAtX - pad) && p.y < (yBotAtX + pad);
 	}
 	else {
 		// 1D vertical barrier has zero interior area (unless a point is literally inside the 2HP peg column)
@@ -380,29 +392,63 @@ static bool segmentHitsObstacle(math::Vec a, math::Vec b, const KeepOutObstacle&
 		return false;
 	}
 
-	// 2D Keep-Out Box [xMin, xMax] x [yTop, yBot]
+	// 2D Keep-Out Quadrilateral bounded by the actual left & right peg columns
 	if (xMax <= xMin || yBot <= yTop) return false;
 
-	// Trivial reject
+	// Trivial reject against bounding box
 	if (std::max(a.x, b.x) < xMin || std::min(a.x, b.x) > xMax ||
 	    std::max(a.y, b.y) < yTop || std::min(a.y, b.y) > yBot) {
 		return false;
 	}
 
-	// Check if midpoint or quarter-points are strictly inside the box interior
-	for (float f : {0.25f, 0.5f, 0.75f}) {
-		math::Vec pt = a.plus(b.minus(a).mult(f));
-		if (pt.x > xMin + 0.5f && pt.x < xMax - 0.5f && pt.y > yTop + 0.5f && pt.y < yBot - 0.5f) return true;
+	// 1. Check left and right vertical peg column barriers
+	float lTop = obs.pegLeftTopY + shrink;
+	float lBot = obs.pegLeftBotY - shrink;
+	if (lBot > lTop && getLineIntersection(a, b, math::Vec(obs.pegLeftX, lTop), math::Vec(obs.pegLeftX, lBot))) {
+		return true;
 	}
 
-	// Shrink box slightly when testing edge intersections so segments running along the outer corners don't self-hit
-	float exMin = xMin + 0.8f;
-	float exMax = xMax - 0.8f;
-	float eyTop = yTop + 0.8f;
-	float eyBot = yBot - 0.8f;
-	if (exMax <= exMin || eyBot <= eyTop) return false;
+	float rTop = obs.pegRightTopY + shrink;
+	float rBot = obs.pegRightBotY - shrink;
+	if (rBot > rTop && getLineIntersection(a, b, math::Vec(obs.pegRightX, rTop), math::Vec(obs.pegRightX, rBot))) {
+		return true;
+	}
 
-	math::Vec tl(exMin, eyTop), tr(exMax, eyTop), br(exMax, eyBot), bl(exMin, eyBot);
+	// Check physical peg posts (skipping if segment endpoint is already a detour waypoint around that peg)
+	float pegR = std::max(2.0f, 7.5f - shrink);
+	math::Vec pegs[4] = {
+		math::Vec(obs.pegLeftX, obs.pegLeftTopY),
+		math::Vec(obs.pegRightX, obs.pegRightTopY),
+		math::Vec(obs.pegRightX, obs.pegRightBotY),
+		math::Vec(obs.pegLeftX, obs.pegLeftBotY)
+	};
+	for (int i = 0; i < 4; ++i) {
+		if (a.minus(pegs[i]).norm() < 18.0f || b.minus(pegs[i]).norm() < 18.0f) continue;
+		if (distPointToSegment(pegs[i], a, b) < pegR) return true;
+	}
+
+	// 2. Check quadrilateral interior and perimeter edges between pegLeftX and pegRightX
+	float exMin = obs.pegLeftX + 0.8f;
+	float exMax = obs.pegRightX - 0.8f;
+	if (exMax <= exMin) return false;
+
+	float padY = 11.0f - shrink - 0.8f;
+	math::Vec tl(exMin, obs.pegTopAtX(exMin) - padY);
+	math::Vec tr(exMax, obs.pegTopAtX(exMax) - padY);
+	math::Vec br(exMax, obs.pegBotAtX(exMax) + padY);
+	math::Vec bl(exMin, obs.pegBotAtX(exMin) + padY);
+	if (bl.y <= tl.y || br.y <= tr.y) return false;
+
+	// Check if midpoint or quarter-points are strictly inside the quadrilateral interior
+	for (float f : {0.25f, 0.5f, 0.75f}) {
+		math::Vec pt = a.plus(b.minus(a).mult(f));
+		if (pt.x > exMin && pt.x < exMax) {
+			float yT = obs.pegTopAtX(pt.x) - padY;
+			float yB = obs.pegBotAtX(pt.x) + padY;
+			if (pt.y > yT && pt.y < yB) return true;
+		}
+	}
+
 	if (getLineIntersection(a, b, tl, tr)) return true;
 	if (getLineIntersection(a, b, tr, br)) return true;
 	if (getLineIntersection(a, b, br, bl)) return true;
@@ -459,35 +505,83 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, bo
 		return result;
 	}
 
-	// 2D Keep-Out Box: consider candidate 1-corner and 2-corner paths around the 4 corners of the box
+	// 2D Keep-Out Quadrilateral: actual peg corners on the left and right columns
+	const float margin = 11.0f + extraMargin;
+	float dyTop = obs.pegRightTopY - obs.pegLeftTopY;
+	float dyBot = obs.pegRightBotY - obs.pegLeftBotY;
+
+	// Smoothly center acute peaks on the peg X when one column is taller/lower than the other
+	float shiftTopL = margin * math::clamp(1.0f - dyTop / (margin * 2.0f), 0.0f, 1.0f);
+	float shiftTopR = margin * math::clamp(1.0f + dyTop / (margin * 2.0f), 0.0f, 1.0f);
+	float shiftBotL = margin * math::clamp(1.0f + dyBot / (margin * 2.0f), 0.0f, 1.0f);
+	float shiftBotR = margin * math::clamp(1.0f - dyBot / (margin * 2.0f), 0.0f, 1.0f);
+
 	math::Vec corners[4] = {
-		math::Vec(obs.xMin - extraMargin, obs.yTop - extraMargin), // 0: TL
-		math::Vec(obs.xMax + extraMargin, obs.yTop - extraMargin), // 1: TR
-		math::Vec(obs.xMax + extraMargin, obs.yBot + extraMargin), // 2: BR
-		math::Vec(obs.xMin - extraMargin, obs.yBot + extraMargin)  // 3: BL
+		math::Vec(obs.pegLeftX - shiftTopL, obs.pegLeftTopY - margin),  // 0: TL
+		math::Vec(obs.pegRightX + shiftTopR, obs.pegRightTopY - margin), // 1: TR
+		math::Vec(obs.pegRightX + shiftBotR, obs.pegRightBotY + margin), // 2: BR
+		math::Vec(obs.pegLeftX - shiftBotL, obs.pegLeftBotY + margin)   // 3: BL
 	};
 
-	// Check if straight line A -> B clears the box, meaning only gravity sag drooped into the top of the box
-	bool straightCrosses = segmentHitsObstacle(A, B, obs, 1.5f);
-	if (!straightCrosses && useQuadSlump) {
-		bool leftToRight = (A.x <= B.x);
-		return leftToRight
-			? std::vector<math::Vec>{corners[0], corners[1]}
-			: std::vector<math::Vec>{corners[1], corners[0]};
-	}
+	math::Vec sideCorners[4] = {
+		math::Vec(obs.pegLeftX - margin, obs.pegLeftTopY - margin),  // 0: TL (side rail)
+		math::Vec(obs.pegRightX + margin, obs.pegRightTopY - margin), // 1: TR (side rail)
+		math::Vec(obs.pegRightX + margin, obs.pegRightBotY + margin), // 2: BR (side rail)
+		math::Vec(obs.pegLeftX - margin, obs.pegLeftBotY + margin)   // 3: BL (side rail)
+	};
 
-	float bestCost = 1e18f;
-
-	// Helper to test if a segment from a port/waypoint to a corner (with its moderate end-slack sag) hits the box
+	// Helper to test if a segment from a port/waypoint to a corner (including its sag curve) hits the obstacle
 	auto endSegmentWithSlackHitsBox = [&](math::Vec P, math::Vec Q) -> bool {
 		if (segmentHitsObstacle(P, Q, obs, 1.5f)) return true;
 		float d = P.minus(Q).norm();
-		float sag = computeEndSlackSag(d);
-		math::Vec slump = P.plus(Q).div(2.f).plus(math::Vec(0.f, sag));
-		return curveHitsObstacle(P, slump, slump, Q, true, obs, 2.0f);
+		if (d < 1e-3f) return false;
+		if (useQuadSlump) {
+			float sag = computeEndSlackSag(d);
+			math::Vec slump = P.plus(Q).div(2.f).plus(math::Vec(0.f, sag));
+			return curveHitsObstacle(P, slump, slump, Q, true, obs, 2.0f);
+		}
+		else {
+			float sag = computeTiedSag(d);
+			math::Vec dir = Q.minus(P).div(d);
+			math::Vec p1 = P.plus(dir.mult(d * 0.35f)).plus(math::Vec(0.f, sag));
+			math::Vec p2 = Q.minus(dir.mult(d * 0.35f)).plus(math::Vec(0.f, sag));
+			return curveHitsObstacle(P, p1, p2, Q, false, obs, 2.0f);
+		}
 	};
 
-	// Test 1-corner detours
+	float bestCost = 1e18f;
+
+	// Check if straight line A -> B clears the obstacle, meaning only gravity sag drooped into the top
+	bool straightCrosses = segmentHitsObstacle(A, B, obs, 1.5f);
+	if (!straightCrosses && useQuadSlump) {
+		// Only test top pegs (0: TL, 1: TR) so a cable drooping from above is supported from the top
+		for (int c = 0; c <= 1; ++c) {
+			math::Vec C = corners[c];
+			if (!endSegmentWithSlackHitsBox(A, C) && !endSegmentWithSlackHitsBox(C, B)) {
+				float cost = A.minus(C).norm() + C.minus(B).norm();
+				if (cost < bestCost) {
+					bestCost = cost;
+					result = {C};
+				}
+			}
+		}
+		bool leftToRight = (A.x <= B.x);
+		math::Vec C1 = leftToRight ? corners[0] : corners[1];
+		math::Vec C2 = leftToRight ? corners[1] : corners[0];
+		if (!endSegmentWithSlackHitsBox(A, C1) && !endSegmentWithSlackHitsBox(C2, B)) {
+			float cost = A.minus(C1).norm() + C1.minus(C2).norm() + C2.minus(B).norm();
+			if (cost < bestCost) {
+				bestCost = cost;
+				result = {C1, C2};
+			}
+		}
+		if (result.empty()) {
+			result = {C1, C2};
+		}
+		return result;
+	}
+
+	// Test 1-corner detours (taut convex hull: only touches 1 peg if the path from that peg to the port clears the other pegs)
 	for (int c = 0; c < 4; ++c) {
 		math::Vec C = corners[c];
 		if (!endSegmentWithSlackHitsBox(A, C) && !endSegmentWithSlackHitsBox(C, B)) {
@@ -500,15 +594,21 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, bo
 	}
 
 	// Test 2-corner detours along perimeter edges (adjacent corners; C1->C2 is taut/straight!)
-	int adjPairs[8][2] = {
-		{0, 1}, {1, 0}, // Top edge (TL <-> TR)
-		{3, 2}, {2, 3}, // Bottom edge (BL <-> BR)
-		{0, 3}, {3, 0}, // Left edge (TL <-> BL)
-		{1, 2}, {2, 1}  // Right edge (TR <-> BR)
+	struct AdjEdge {
+		int c1;
+		int c2;
+		bool isVerticalSide;
+	};
+	const AdjEdge adjPairs[8] = {
+		{0, 1, false}, {1, 0, false}, // Top edge (TL <-> TR)
+		{3, 2, false}, {2, 3, false}, // Bottom edge (BL <-> BR)
+		{0, 3, true},  {3, 0, true},  // Left edge (TL <-> BL)
+		{1, 2, true},  {2, 1, true}   // Right edge (TR <-> BR)
 	};
 	for (int p = 0; p < 8; ++p) {
-		math::Vec C1 = corners[adjPairs[p][0]];
-		math::Vec C2 = corners[adjPairs[p][1]];
+		const math::Vec* src = adjPairs[p].isVerticalSide ? sideCorners : corners;
+		math::Vec C1 = src[adjPairs[p].c1];
+		math::Vec C2 = src[adjPairs[p].c2];
 		if (!endSegmentWithSlackHitsBox(A, C1) && !endSegmentWithSlackHitsBox(C2, B)) {
 			float cost = A.minus(C1).norm() + C1.minus(C2).norm() + C2.minus(B).norm();
 			if (cost < bestCost) {
@@ -518,7 +618,19 @@ static std::vector<math::Vec> computeObstacleDetour(math::Vec A, math::Vec B, bo
 		}
 	}
 
-	// Fallback if neither 1-corner nor 2-corner passed strict check: pick shortest top or bottom 2-corner bridge
+	// Fallback if neither 1-corner nor 2-corner passed strict sag check: test straight-line clearance first, then bridge
+	if (result.empty()) {
+		for (int c = 0; c < 4; ++c) {
+			math::Vec C = corners[c];
+			if (!segmentHitsObstacle(A, C, obs, 2.5f) && !segmentHitsObstacle(C, B, obs, 2.5f)) {
+				float cost = A.minus(C).norm() + C.minus(B).norm();
+				if (cost < bestCost) {
+					bestCost = cost;
+					result = {C};
+				}
+			}
+		}
+	}
 	if (result.empty()) {
 		bool leftToRight = (A.x <= B.x);
 		std::vector<math::Vec> topBridge = leftToRight
@@ -612,7 +724,10 @@ static std::vector<math::Vec> routeSegmentAroundObstacles(
 				}
 
 				if (hit) {
-					math::Vec obsCenter((obs->xMin + obs->xMax) * 0.5f, (obs->yTop + obs->yBot) * 0.5f);
+					math::Vec obsCenter(
+						(obs->pegLeftX + obs->pegRightX) * 0.5f,
+						(obs->pegLeftTopY + obs->pegLeftBotY + obs->pegRightTopY + obs->pegRightBotY) * 0.25f
+					);
 					float d = A.minus(obsCenter).norm();
 					if (d < bestDist) {
 						bestDist = d;
